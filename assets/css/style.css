@@ -1,0 +1,171 @@
+/* Gitaloy — sms-dashboard UI theme */
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* ---------- Scrollbars (sms-dashboard style) ---------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #a7f3d0;
+  border-radius: 9999px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #065f46;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.subnav {
+  scrollbar-width: thin;
+  scrollbar-color: #a7f3d0 transparent;
+}
+.subnav::-webkit-scrollbar {
+  height: 6px;
+}
+.subnav::-webkit-scrollbar-thumb {
+  background: #a7f3d0;
+  border-radius: 9999px;
+}
+
+/* ---------- Animations ---------- */
+.fade-in {
+  animation: fadeIn 0.25s ease both;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.slide-down {
+  animation: slideDown 0.22s ease both;
+}
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.drop-zone {
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.drop-zone:hover {
+  border-color: #059669;
+  background: #ecfdf5;
+}
+
+input[type="range"] {
+  accent-color: #059669;
+}
+
+/* Legacy compatibility (kept so existing pages still style correctly) */
+.card-sheen {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(238, 249, 243, 0.95));
+  box-shadow: 0 20px 45px -24px rgba(6, 95, 70, 0.35);
+}
+
+.alert-warning {
+  background-color: #fffbeb;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+}
+
+/* ---------- Report documents (printable) ---------- */
+.report-doc table {
+  border-collapse: collapse;
+}
+
+.report-doc th,
+.report-doc td {
+  border: 1px solid #cbd5e1;
+}
+
+.sig-rule {
+  border-top: 2px solid #0f172a;
+}
+
+/* ---------- Print ---------- */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  header,
+  aside,
+  .flex-1.flex > aside {
+    display: none !important;
+  }
+
+  .flex-1.flex,
+  main {
+    display: block !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+}
+
+/* ---------- Sidebar collapse (desktop hide/unhide) ---------- */
+@media (min-width: 1024px) {
+  .sidebar-collapsed #app-sidebar {
+    width: 5rem;
+  }
+
+  .sidebar-collapsed #app-sidebar .sidebar-brand {
+    justify-content: center;
+  }
+
+  .sidebar-collapsed #app-sidebar .sidebar-brand-text,
+  .sidebar-collapsed #app-sidebar .sidebar-heading,
+  .sidebar-collapsed #app-sidebar .sidebar-label {
+    display: none;
+  }
+
+  .sidebar-collapsed #app-sidebar nav {
+    padding: 0.75rem;
+  }
+
+  .sidebar-collapsed #app-sidebar nav a {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .sidebar-collapsed #app-sidebar .sidebar-brand {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
