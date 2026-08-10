@@ -25,7 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
 
-    if ($formData['name'] === '' || $formData['username'] === '' || $password === '') {
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } elseif ($formData['name'] === '' || $formData['username'] === '' || $password === '') {
         $error = 'Full name, username, and password are required.';
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters.';
@@ -81,6 +83,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php endif; ?>
 
             <form class="mt-6 space-y-4" method="post" action="<?= appBaseUrl() ?>/modules/auth/register.php">
+                <?= csrfField() ?>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-slate-700">Full name</label>
                     <input type="text" name="name" value="<?= htmlspecialchars($formData['name']) ?>" class="w-full rounded-xl border border-emerald-200 px-3 py-2" required autofocus>

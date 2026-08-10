@@ -9,7 +9,9 @@ $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
-    if ($action === 'create') {
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } elseif ($action === 'create') {
         $name = trim($_POST['name'] ?? '');
         $description = trim($_POST['description'] ?? '');
         if ($name === '') {
@@ -64,6 +66,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     <p class="ml-auto text-xs font-medium text-slate-400">Then assign actions on the next screen</p>
                 </header>
                 <form method="post" class="p-5 space-y-4">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="create">
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
@@ -122,6 +125,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                             </a>
                                             <?php if ((int) $role['is_system'] === 0 && (int) $role['user_count'] === 0): ?>
                                                 <form method="post" onsubmit="return confirm('Delete the role &quot;<?= htmlspecialchars($role['name'], ENT_QUOTES) ?>&quot;?');">
+                                                    <?= csrfField() ?>
                                                     <input type="hidden" name="action" value="delete">
                                                     <input type="hidden" name="id" value="<?= (int) $role['id'] ?>">
                                                     <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50">

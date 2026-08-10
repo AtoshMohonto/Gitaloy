@@ -17,6 +17,9 @@ $teacherCenterId = $isTeacher ? (int) (currentUser()['center_id'] ?? 0) : null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } else {
     if ($action === 'create_fee') {
         $studentId = (int) ($_POST['student_id'] ?? 0);
         $headId = (int) ($_POST['head_id'] ?? 0);
@@ -112,6 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success = 'Expense deleted.';
         logActivity('Deleted expense #' . (int) ($_POST['expense_id'] ?? 0), 'fees');
     }
+    }
 }
 
 $yearId = activeYearId();
@@ -184,6 +188,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Add fee (per head)</h2>
                 <form class="mt-4 grid gap-4 md:grid-cols-8" method="post" action="<?= appBaseUrl() ?>/modules/fees/index.php">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="create_fee">
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-sm font-medium">Student</label>
@@ -313,6 +318,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                         <div class="flex flex-wrap gap-2">
                                             <?php if ((float) $fee['paid_amount'] < (float) $fee['amount']): ?>
                                                 <form method="post" action="<?= appBaseUrl() ?>/modules/fees/index.php" class="inline">
+                                                    <?= csrfField() ?>
                                                     <input type="hidden" name="action" value="record_payment">
                                                     <input type="hidden" name="fee_id" value="<?= (int) $fee['id'] ?>">
                                                     <input type="number" name="payment" step="0.01" min="0" placeholder="Pay" class="w-20 rounded-xl border border-emerald-200 px-2 py-1.5 text-xs" required>
@@ -320,6 +326,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                                 </form>
                                             <?php endif; ?>
                                             <form method="post" action="<?= appBaseUrl() ?>/modules/fees/index.php" onsubmit="return confirm('Delete this fee record?');">
+                                                <?= csrfField() ?>
                                                 <input type="hidden" name="action" value="delete_fee">
                                                 <input type="hidden" name="fee_id" value="<?= (int) $fee['id'] ?>">
                                                 <button class="rounded-full border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Delete</button>
@@ -336,6 +343,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Add expense</h2>
                 <form class="mt-4 grid gap-4 md:grid-cols-5" method="post" action="<?= appBaseUrl() ?>/modules/fees/index.php">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="create_expense">
                     <div>
                         <label class="mb-1 block text-sm font-medium">Amount (BDT)</label>
@@ -396,6 +404,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                     <td class="px-3 py-3 text-right font-semibold text-rose-700"><?= number_format((float) $expense['amount'], 2) ?></td>
                                     <td class="px-3 py-3">
                                         <form method="post" action="<?= appBaseUrl() ?>/modules/fees/index.php" onsubmit="return confirm('Delete this expense?');">
+                                            <?= csrfField() ?>
                                             <input type="hidden" name="action" value="delete_expense">
                                             <input type="hidden" name="expense_id" value="<?= (int) $expense['id'] ?>">
                                             <button class="rounded-full border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600">Delete</button>

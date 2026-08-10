@@ -21,7 +21,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $login = trim($_POST['login'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    if ($login === '' || $password === '') {
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } elseif ($login === '' || $password === '') {
         $error = 'Username/email and password are required.';
     } else {
         $pdo = getDbConnection();
@@ -60,6 +62,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <?php endif; ?>
 
         <form class="mt-6 space-y-4" method="post" action="<?= appBaseUrl() ?>/modules/auth/login.php">
+            <?= csrfField() ?>
             <div>
                 <label class="mb-1 block text-sm font-medium text-slate-700">Username or email</label>
                 <input type="text" name="login" class="w-full rounded-xl border border-emerald-200 px-3 py-2" required autofocus>

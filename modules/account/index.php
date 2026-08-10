@@ -22,7 +22,9 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'profile') {
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } elseif ($action === 'profile') {
         $name = trim($_POST['name'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $phone = trim($_POST['phone'] ?? '');
@@ -124,6 +126,7 @@ require_once __DIR__ . '/../../includes/header.php';
                             <h2 class="text-base font-bold text-slate-800">Profile information</h2>
                         </header>
                         <form method="post" class="p-5 space-y-4">
+                            <?= csrfField() ?>
                             <input type="hidden" name="action" value="profile">
                             <div class="grid gap-4 md:grid-cols-2">
                                 <div>
@@ -153,6 +156,7 @@ require_once __DIR__ . '/../../includes/header.php';
                             <p class="ml-auto text-xs font-medium text-slate-400">At least 6 characters</p>
                         </header>
                         <form method="post" class="p-5 space-y-4">
+                            <?= csrfField() ?>
                             <input type="hidden" name="action" value="password">
                             <div class="grid gap-4 md:grid-cols-3">
                                 <div>

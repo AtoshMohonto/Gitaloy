@@ -11,37 +11,41 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'create') {
-        $data = [
-            'class_id' => trim($_POST['class_id'] ?? ''),
-            'subject_id' => trim($_POST['subject_id'] ?? ''),
-            'year_id' => (int) ($_POST['year_id'] ?? activeYearId()),
-            'teacher_id' => isTeacher() ? (int) $_SESSION['user_id'] : (int) ($_POST['teacher_id'] ?? $_SESSION['user_id']),
-            'title' => trim($_POST['title'] ?? ''),
-            'description' => trim($_POST['description'] ?? ''),
-            'due_date' => trim($_POST['due_date'] ?? ''),
-            'total_marks' => (int) ($_POST['total_marks'] ?? 10),
-        ];
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } else {
+        if ($action === 'create') {
+            $data = [
+                'class_id' => trim($_POST['class_id'] ?? ''),
+                'subject_id' => trim($_POST['subject_id'] ?? ''),
+                'year_id' => (int) ($_POST['year_id'] ?? activeYearId()),
+                'teacher_id' => isTeacher() ? (int) $_SESSION['user_id'] : (int) ($_POST['teacher_id'] ?? $_SESSION['user_id']),
+                'title' => trim($_POST['title'] ?? ''),
+                'description' => trim($_POST['description'] ?? ''),
+                'due_date' => trim($_POST['due_date'] ?? ''),
+                'total_marks' => (int) ($_POST['total_marks'] ?? 10),
+            ];
 
-        if ($data['title'] === '') {
-            $error = 'Task title is required.';
-        } else {
-            $data['class_id'] = $data['class_id'] !== '' ? (int) $data['class_id'] : null;
-            $data['subject_id'] = $data['subject_id'] !== '' ? (int) $data['subject_id'] : null;
-            $data['description'] = $data['description'] !== '' ? $data['description'] : null;
-            $data['due_date'] = $data['due_date'] !== '' ? $data['due_date'] : null;
-            $taskId = createTask($data);
-            $success = 'Task created. Now mark student completion.';
-            logActivity('Created task: ' . $data['title'], 'tasks');
-            header('Location: ' . appBaseUrl() . '/modules/tasks/mark.php?id=' . $taskId);
-            exit;
+            if ($data['title'] === '') {
+                $error = 'Task title is required.';
+            } else {
+                $data['class_id'] = $data['class_id'] !== '' ? (int) $data['class_id'] : null;
+                $data['subject_id'] = $data['subject_id'] !== '' ? (int) $data['subject_id'] : null;
+                $data['description'] = $data['description'] !== '' ? $data['description'] : null;
+                $data['due_date'] = $data['due_date'] !== '' ? $data['due_date'] : null;
+                $taskId = createTask($data);
+                $success = 'Task created. Now mark student completion.';
+                logActivity('Created task: ' . $data['title'], 'tasks');
+                header('Location: ' . appBaseUrl() . '/modules/tasks/mark.php?id=' . $taskId);
+                exit;
+            }
         }
-    }
 
-    if ($action === 'delete') {
-        deleteTask((int) ($_POST['task_id'] ?? 0));
-        $success = 'Task deleted.';
-        logActivity('Deleted task #' . (int) ($_POST['task_id'] ?? 0), 'tasks');
+        if ($action === 'delete') {
+            deleteTask((int) ($_POST['task_id'] ?? 0));
+            $success = 'Task deleted.';
+            logActivity('Deleted task #' . (int) ($_POST['task_id'] ?? 0), 'tasks');
+        }
     }
 }
 
@@ -82,6 +86,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Create task</h2>
                 <form class="mt-4 grid gap-4 md:grid-cols-4" method="post" action="<?= appBaseUrl() ?>/modules/tasks/index.php">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="create">
                     <div>
                         <label class="mb-1 block text-sm font-medium">Title</label>
@@ -176,6 +181,7 @@ require_once __DIR__ . '/../../includes/header.php';
                             <div class="mt-4 flex flex-wrap gap-2">
                                 <a href="<?= appBaseUrl() ?>/modules/tasks/mark.php?id=<?= (int) $task['id'] ?>" class="rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white">Mark / Review</a>
                                 <form method="post" action="<?= appBaseUrl() ?>/modules/tasks/index.php" onsubmit="return confirm('Delete this task and all its marks?');">
+                                    <?= csrfField() ?>
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="task_id" value="<?= (int) $task['id'] ?>">
                                     <button class="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600">Delete</button>

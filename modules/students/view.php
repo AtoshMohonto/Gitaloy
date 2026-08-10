@@ -29,6 +29,9 @@ $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isStudent()) {
     $action = $_POST['action'] ?? '';
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } else {
     if ($action === 'upload_doc') {
         if (!empty($_FILES['document']['name'])) {
             $ext = strtolower(pathinfo($_FILES['document']['name'], PATHINFO_EXTENSION));
@@ -58,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isStudent()) {
         $pdo->prepare('DELETE FROM student_documents WHERE id = ? AND student_id = ?')->execute([$docId, $studentId]);
         $success = 'Document removed.';
         logActivity('Removed a document for student #' . $studentId, 'students');
+    }
     }
 }
 
@@ -166,6 +170,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     <?php if (isStaff()): ?>
                         <h3 class="mt-6 text-sm font-semibold text-slate-700">Documents</h3>
                         <form class="mt-2 flex flex-wrap items-center gap-2" method="post" enctype="multipart/form-data" action="<?= appBaseUrl() ?>/modules/students/view.php?id=<?= (int) $studentId ?>">
+                            <?= csrfField() ?>
                             <input type="hidden" name="action" value="upload_doc">
                             <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.webp" class="rounded-xl border border-emerald-200 px-3 py-2 text-sm">
                             <button class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Upload</button>
@@ -178,6 +183,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                     <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
                                         <a href="<?= appBaseUrl() ?>/<?= htmlspecialchars($doc['file_path']) ?>" target="_blank">📎 View</a>
                                         <form method="post" action="<?= appBaseUrl() ?>/modules/students/view.php?id=<?= (int) $studentId ?>" class="inline">
+                                            <?= csrfField() ?>
                                             <input type="hidden" name="action" value="delete_doc">
                                             <input type="hidden" name="doc_id" value="<?= (int) $doc['id'] ?>">
                                             <button class="text-red-600">✕</button>

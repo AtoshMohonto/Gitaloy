@@ -19,37 +19,41 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'save') {
-        $studentIds = $_POST['student_id'] ?? [];
-        $marks = $_POST['marks'] ?? [];
-        $completed = $_POST['completed'] ?? [];
-        $remarks = $_POST['remarks'] ?? [];
-        $total = (int) $task['total_marks'];
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } else {
+        if ($action === 'save') {
+            $studentIds = $_POST['student_id'] ?? [];
+            $marks = $_POST['marks'] ?? [];
+            $completed = $_POST['completed'] ?? [];
+            $remarks = $_POST['remarks'] ?? [];
+            $total = (int) $task['total_marks'];
 
-        foreach ($studentIds as $i => $studentId) {
-            $obtained = (float) ($marks[$i] ?? 0);
-            if ($obtained > $total) {
-                $obtained = $total;
+            foreach ($studentIds as $i => $studentId) {
+                $obtained = (float) ($marks[$i] ?? 0);
+                if ($obtained > $total) {
+                    $obtained = $total;
+                }
+                if ($obtained < 0) {
+                    $obtained = 0;
+                }
+                saveTaskResult(
+                    $taskId,
+                    (int) $studentId,
+                    $obtained,
+                    isset($completed[$i]),
+                    trim($remarks[$i] ?? '') !== '' ? trim($remarks[$i]) : null
+                );
             }
-            if ($obtained < 0) {
-                $obtained = 0;
-            }
-            saveTaskResult(
-                $taskId,
-                (int) $studentId,
-                $obtained,
-                isset($completed[$i]),
-                trim($remarks[$i] ?? '') !== '' ? trim($remarks[$i]) : null
-            );
+            $success = 'Marks saved.';
+            logActivity('Saved marks for task: ' . $task['title'], 'tasks');
         }
-        $success = 'Marks saved.';
-        logActivity('Saved marks for task: ' . $task['title'], 'tasks');
-    }
 
-    if ($action === 'remove') {
-        deleteTaskResult($taskId, (int) ($_POST['student_id'] ?? 0));
-        $success = 'Mark removed.';
-        logActivity('Removed a mark for task: ' . $task['title'], 'tasks');
+        if ($action === 'remove') {
+            deleteTaskResult($taskId, (int) ($_POST['student_id'] ?? 0));
+            $success = 'Mark removed.';
+            logActivity('Removed a mark for task: ' . $task['title'], 'tasks');
+        }
     }
 }
 
@@ -88,6 +92,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     <p class="mt-3 text-sm text-slate-500">All students in scope are marked.</p>
                 <?php else: ?>
                     <form class="mt-4 space-y-3" method="post" action="<?= appBaseUrl() ?>/modules/tasks/mark.php?id=<?= $taskId ?>">
+                        <?= csrfField() ?>
                         <input type="hidden" name="action" value="save">
                         <div class="overflow-x-auto">
                             <table class="w-full min-w-[700px] text-left text-sm">
@@ -156,6 +161,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                         <td class="px-3 py-3 text-slate-600"><?= htmlspecialchars($row['remarks'] ?: '—') ?></td>
                                         <td class="px-3 py-3">
                                             <form method="post" action="<?= appBaseUrl() ?>/modules/tasks/mark.php?id=<?= $taskId ?>" onsubmit="return confirm('Remove this mark?');">
+                                                <?= csrfField() ?>
                                                 <input type="hidden" name="action" value="remove">
                                                 <input type="hidden" name="student_id" value="<?= (int) $row['student_id'] ?>">
                                                 <button class="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600">Remove</button>

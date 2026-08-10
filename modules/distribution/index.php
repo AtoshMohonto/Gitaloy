@@ -12,6 +12,9 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } else {
     if ($action === 'create_plan') {
         $title = trim($_POST['title'] ?? '');
         $scopeType = $_POST['scope_type'] ?? 'district';
@@ -54,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) {
             $error = 'Could not save distribution: ' . $e->getMessage();
         }
+    }
     }
 }
 
@@ -124,6 +128,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Create distribution plan</h2>
                 <form class="mt-4 grid gap-4 md:grid-cols-6" method="post" action="<?= appBaseUrl() ?>/modules/distribution/index.php">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="create_plan">
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-sm font-medium">Title</label>
@@ -189,6 +194,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         }
                     ?>
                     <form class="mt-5" method="post" action="<?= appBaseUrl() ?>/modules/distribution/index.php">
+                        <?= csrfField() ?>
                         <input type="hidden" name="action" value="save_distributions">
                         <input type="hidden" name="plan_id" value="<?= (int) $selectedPlan['id'] ?>">
                         <div class="overflow-x-auto">
@@ -267,6 +273,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                 <a href="<?= appBaseUrl() ?>/modules/distribution/index.php?assign=<?= (int) $plan['id'] ?>" class="rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white">Assign</a>
                                 <a href="<?= appBaseUrl() ?>/modules/reports/distribution.php?plan_id=<?= (int) $plan['id'] ?>" class="rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-slate-700">Report</a>
                                 <form method="post" action="<?= appBaseUrl() ?>/modules/distribution/index.php" onsubmit="return confirm('Delete this plan and its records?');">
+                                    <?= csrfField() ?>
                                     <input type="hidden" name="action" value="delete_plan">
                                     <input type="hidden" name="plan_id" value="<?= (int) $plan['id'] ?>">
                                     <button class="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600">Delete</button>

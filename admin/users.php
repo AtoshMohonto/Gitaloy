@@ -12,6 +12,9 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
+        if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+            throw new RuntimeException('Invalid request. Please refresh and try again.');
+        }
         if ($action === 'create') {
             $name = trim($_POST['name'] ?? '');
             $roleId = (int) ($_POST['role_id'] ?? 0);
@@ -96,6 +99,7 @@ require_once __DIR__ . '/../includes/header.php';
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Create user</h2>
                 <form class="mt-4 grid gap-4 md:grid-cols-3" method="post">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="create">
                     <div>
                         <label class="mb-1 block text-sm font-medium text-slate-600">Full name</label>
@@ -204,17 +208,20 @@ require_once __DIR__ . '/../includes/header.php';
                                     <td class="px-3 py-3">
                                         <div class="flex justify-end gap-2">
                                             <form method="post">
+                                                <?= csrfField() ?>
                                                 <input type="hidden" name="action" value="toggle">
                                                 <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
                                                 <button class="rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-slate-700"><?= $user['is_active'] ? 'Disable' : 'Enable' ?></button>
                                             </form>
                                             <form method="post" onsubmit="return confirm('Reset password to gitaloy123?');">
+                                                <?= csrfField() ?>
                                                 <input type="hidden" name="action" value="reset">
                                                 <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
                                                 <button class="rounded-full border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700">Reset</button>
                                             </form>
                                             <?php if ((int) $user['role_id'] !== ROLE_ADMIN): ?>
                                                 <form method="post" onsubmit="return confirm('Delete this user?');">
+                                                    <?= csrfField() ?>
                                                     <input type="hidden" name="action" value="delete">
                                                     <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
                                                     <button class="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600">Delete</button>

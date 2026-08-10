@@ -12,6 +12,9 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
+        if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+            throw new RuntimeException('Invalid request. Please refresh and try again.');
+        }
         if ($action === 'add') {
             $name = trim($_POST['name'] ?? '');
             $villageId = (int) ($_POST['village_id'] ?? 0);
@@ -71,6 +74,7 @@ require_once __DIR__ . '/../includes/header.php';
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Add center</h2>
                 <form class="mt-4 grid gap-4 md:grid-cols-3" method="post">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="add">
                     <input type="text" name="name" placeholder="e.g. Gitaloy Mondir" class="rounded-xl border border-emerald-200 px-3 py-2" required>
                     <select name="village_id" class="rounded-xl border border-emerald-200 px-3 py-2">
@@ -113,6 +117,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     <td class="px-3 py-3 text-right text-slate-700"><?= (int) $center['student_count'] ?></td>
                                     <td class="px-3 py-3 text-right">
                                         <form method="post" onsubmit="return confirm('Delete this center? Its students will keep their records.');">
+                                            <?= csrfField() ?>
                                             <input type="hidden" name="action" value="delete">
                                             <input type="hidden" name="id" value="<?= (int) $center['id'] ?>">
                                             <button class="text-xs font-semibold text-red-500 hover:underline">Delete</button>

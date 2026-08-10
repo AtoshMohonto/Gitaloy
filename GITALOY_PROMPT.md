@@ -64,6 +64,11 @@ village → upazila → district → division chain.
 ## Technical notes
 
 - Stack: PHP 8, MySQL/MariaDB, Tailwind CSS + Lucide icons (CDN). No Composer.
+- **CSRF protection** (added 2026-08-10): `csrfToken()`, `csrfField()`, `validateCsrf()` in
+  `includes/auth.php`. Every `method="post"` form emits `<?= csrfField() ?>` as its first
+  line; every POST handler validates `$_POST['csrf_token']` before touching anything else
+  (as a `throw new RuntimeException(...)` at the top of the existing try/catch where one
+  exists, or as an `if`/`else` guard where it doesn't). Follow this pattern for any new form.
 - `config/database.php` auto-creates the DB and applies `database_schema.sql` idempotently.
 - Layout: `includes/header.php` + `includes/sidebar.php` + `includes/footer.php`.
   The sidebar groups navigation into clusters (Overview, Operations, My Studies, Administration,

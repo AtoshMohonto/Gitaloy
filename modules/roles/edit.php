@@ -15,6 +15,9 @@ $success = null;
 $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } else {
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $permissionIds = array_map('intval', $_POST['permissions'] ?? []);
@@ -30,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity('Updated role permissions: ' . $role['name'], 'roles');
         $success = 'Role updated. ' . count($permissionIds) . ' action(s) assigned.';
         $role = getRoleById($roleId);
+    }
     }
 }
 
@@ -68,6 +72,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php endif; ?>
 
             <form method="post" class="space-y-6">
+                <?= csrfField() ?>
                 <section class="rounded-2xl border border-emerald-100 bg-white shadow-sm">
                     <header class="flex flex-wrap items-center gap-2 border-b border-emerald-100 px-5 py-4">
                         <h2 class="text-base font-bold text-slate-800">Role details</h2>

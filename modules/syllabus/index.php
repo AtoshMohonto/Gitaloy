@@ -28,42 +28,46 @@ if (isset($_GET['edit'])) {
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    $data = [
-        'class_id' => trim($_POST['class_id'] ?? ''),
-        'subject_id' => trim($_POST['subject_id'] ?? ''),
-        'year_id' => trim($_POST['year_id'] ?? (string) activeYearId()),
-        'title' => trim($_POST['title'] ?? ''),
-        'description' => trim($_POST['description'] ?? ''),
-        'term' => trim($_POST['term'] ?? ''),
-    ];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !validateCsrf($_POST['csrf_token'] ?? null)) {
+    $error = 'Invalid request. Please refresh and try again.';
+} else {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $action = $_POST['action'] ?? '';
+        $data = [
+            'class_id' => trim($_POST['class_id'] ?? ''),
+            'subject_id' => trim($_POST['subject_id'] ?? ''),
+            'year_id' => trim($_POST['year_id'] ?? (string) activeYearId()),
+            'title' => trim($_POST['title'] ?? ''),
+            'description' => trim($_POST['description'] ?? ''),
+            'term' => trim($_POST['term'] ?? ''),
+        ];
 
-    if ($data['title'] === '') {
-        $error = 'Syllabus title is required.';
-    } else {
-        $data['class_id'] = $data['class_id'] !== '' ? (int) $data['class_id'] : null;
-        $data['subject_id'] = $data['subject_id'] !== '' ? (int) $data['subject_id'] : null;
-        $data['year_id'] = (int) $data['year_id'];
-        $data['term'] = $data['term'] !== '' ? $data['term'] : null;
-        $data['description'] = $data['description'] !== '' ? $data['description'] : null;
-
-        if ($action === 'update') {
-            updateSyllabus((int) ($_POST['id'] ?? 0), $data);
-            $success = 'Syllabus updated.';
-            logActivity('Updated syllabus: ' . $data['title'], 'syllabus');
+        if ($data['title'] === '') {
+            $error = 'Syllabus title is required.';
         } else {
-            createSyllabus($data);
-            $success = 'Syllabus added.';
-            logActivity('Added syllabus: ' . $data['title'], 'syllabus');
+            $data['class_id'] = $data['class_id'] !== '' ? (int) $data['class_id'] : null;
+            $data['subject_id'] = $data['subject_id'] !== '' ? (int) $data['subject_id'] : null;
+            $data['year_id'] = (int) $data['year_id'];
+            $data['term'] = $data['term'] !== '' ? $data['term'] : null;
+            $data['description'] = $data['description'] !== '' ? $data['description'] : null;
+
+            if ($action === 'update') {
+                updateSyllabus((int) ($_POST['id'] ?? 0), $data);
+                $success = 'Syllabus updated.';
+                logActivity('Updated syllabus: ' . $data['title'], 'syllabus');
+            } else {
+                createSyllabus($data);
+                $success = 'Syllabus added.';
+                logActivity('Added syllabus: ' . $data['title'], 'syllabus');
+            }
         }
     }
-}
 
-if (($_SERVER['REQUEST_METHOD'] === 'POST') && ($_POST['action'] ?? '') === 'delete') {
-    deleteSyllabus((int) ($_POST['syllabus_id'] ?? 0));
-    $success = 'Syllabus deleted.';
-    logActivity('Deleted syllabus #' . (int) ($_POST['syllabus_id'] ?? 0), 'syllabus');
+    if (($_SERVER['REQUEST_METHOD'] === 'POST') && ($_POST['action'] ?? '') === 'delete') {
+        deleteSyllabus((int) ($_POST['syllabus_id'] ?? 0));
+        $success = 'Syllabus deleted.';
+        logActivity('Deleted syllabus #' . (int) ($_POST['syllabus_id'] ?? 0), 'syllabus');
+    }
 }
 
 $filters = [
@@ -102,6 +106,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900"><?= $editSyllabus ? 'Edit syllabus' : 'Add syllabus topic' ?></h2>
                 <form class="mt-4 grid gap-4 md:grid-cols-4" method="post" action="<?= appBaseUrl() ?>/modules/syllabus/index.php">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="<?= $editSyllabus ? 'update' : 'create' ?>">
                     <?php if ($editSyllabus): ?>
                         <input type="hidden" name="id" value="<?= (int) $editSyllabus['id'] ?>">
@@ -192,6 +197,7 @@ require_once __DIR__ . '/../../includes/header.php';
                             <div class="mt-4 flex gap-2">
                                 <a href="<?= appBaseUrl() ?>/modules/syllabus/index.php?edit=<?= (int) $syllabus['id'] ?>" class="rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-slate-700">Edit</a>
                                 <form method="post" action="<?= appBaseUrl() ?>/modules/syllabus/index.php" onsubmit="return confirm('Delete this topic?');">
+                                    <?= csrfField() ?>
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="syllabus_id" value="<?= (int) $syllabus['id'] ?>">
                                     <button class="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600">Delete</button>

@@ -20,44 +20,48 @@ $success = null;
 $error = null;
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
-    $current = getSettings();
-    foreach ($defaults as $key => $default) {
-        if ($key === 'hero_image') {
-            continue;
-        }
-        if ($key === 'notice_active') {
-            saveSetting($key, isset($_POST['notice_active']) ? '1' : '0');
-            continue;
-        }
-        saveSetting($key, trim($_POST[$key] ?? ($current[$key] ?? $default)));
-    }
-
-    if (isset($_POST['remove_hero_image'])) {
-        saveSetting('hero_image', '');
-    }
-    if (!empty($_FILES['hero_image']['name'])) {
-        $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
-        $mime = $_FILES['hero_image']['type'];
-        if (!isset($allowed[$mime])) {
-            $error = 'Please upload a JPG, PNG, WebP or GIF picture.';
-        } else {
-            $upDir = dirname(__DIR__, 2) . '/uploads';
-            if (!is_dir($upDir)) {
-                @mkdir($upDir, 0777, true);
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } else {
+        $current = getSettings();
+        foreach ($defaults as $key => $default) {
+            if ($key === 'hero_image') {
+                continue;
             }
-            $ext = $allowed[$mime];
-            $name = 'hero_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-            if (is_dir($upDir) && move_uploaded_file($_FILES['hero_image']['tmp_name'], $upDir . '/' . $name)) {
-                saveSetting('hero_image', 'uploads/' . $name);
+            if ($key === 'notice_active') {
+                saveSetting($key, isset($_POST['notice_active']) ? '1' : '0');
+                continue;
+            }
+            saveSetting($key, trim($_POST[$key] ?? ($current[$key] ?? $default)));
+        }
+
+        if (isset($_POST['remove_hero_image'])) {
+            saveSetting('hero_image', '');
+        }
+        if (!empty($_FILES['hero_image']['name'])) {
+            $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+            $mime = $_FILES['hero_image']['type'];
+            if (!isset($allowed[$mime])) {
+                $error = 'Please upload a JPG, PNG, WebP or GIF picture.';
             } else {
-                $error = 'The picture could not be uploaded.';
+                $upDir = dirname(__DIR__, 2) . '/uploads';
+                if (!is_dir($upDir)) {
+                    @mkdir($upDir, 0777, true);
+                }
+                $ext = $allowed[$mime];
+                $name = 'hero_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                if (is_dir($upDir) && move_uploaded_file($_FILES['hero_image']['tmp_name'], $upDir . '/' . $name)) {
+                    saveSetting('hero_image', 'uploads/' . $name);
+                } else {
+                    $error = 'The picture could not be uploaded.';
+                }
             }
         }
-    }
 
-    logActivity('Updated frontend content', 'content');
-    if ($error === null) {
-        $success = 'Frontend content saved successfully.';
+        logActivity('Updated frontend content', 'content');
+        if ($error === null) {
+            $success = 'Frontend content saved successfully.';
+        }
     }
 }
 
@@ -88,6 +92,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php endif; ?>
 
             <form method="post" enctype="multipart/form-data" class="space-y-6">
+                <?= csrfField() ?>
                 <section class="rounded-2xl border border-emerald-100 bg-white shadow-sm">
                     <header class="flex flex-wrap items-center gap-2 border-b border-emerald-100 px-5 py-4">
                         <h2 class="text-base font-bold text-slate-800">Landing page hero</h2>

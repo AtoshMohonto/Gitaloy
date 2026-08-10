@@ -56,6 +56,9 @@ if (isset($_GET['edit'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } else {
     if ($action === 'create' || $action === 'update') {
         $formData['name'] = trim($_POST['name'] ?? '');
         $formData['guardian_name'] = trim($_POST['guardian_name'] ?? '');
@@ -159,6 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             logActivity('Reset password for student: ' . $student['student_id'], 'students');
         }
     }
+    }
 }
 
 $filters = [
@@ -209,6 +213,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 <section id="student-form" class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                     <h2 class="text-xl font-semibold text-slate-900"><?= $editStudent ? 'Edit student' : 'Add new student' ?></h2>
                     <form class="mt-5 grid gap-4 lg:grid-cols-3" method="post" action="<?= appBaseUrl() ?>/modules/students/index.php" novalidate>
+                        <?= csrfField() ?>
                         <input type="hidden" name="action" value="<?= $editStudent ? 'update' : 'create' ?>">
                         <?php if ($editStudent): ?>
                             <input type="hidden" name="id" value="<?= (int) $editStudent['id'] ?>">
@@ -393,18 +398,21 @@ require_once __DIR__ . '/../../includes/header.php';
                                             <a href="<?= appBaseUrl() ?>/modules/students/index.php?edit=<?= (int) $student['id'] ?>#student-form" class="rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">Edit</a>
                                             <?php if (empty($student['user_id'])): ?>
                                                 <form method="post" action="<?= appBaseUrl() ?>/modules/students/index.php" class="inline">
+                                                    <?= csrfField() ?>
                                                     <input type="hidden" name="action" value="gen_login">
                                                     <input type="hidden" name="student_id" value="<?= (int) $student['id'] ?>">
                                                     <button class="rounded-full border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">Create login</button>
                                                 </form>
                                             <?php else: ?>
                                                 <form method="post" action="<?= appBaseUrl() ?>/modules/students/index.php" class="inline">
+                                                    <?= csrfField() ?>
                                                     <input type="hidden" name="action" value="reset_pass">
                                                     <input type="hidden" name="student_id" value="<?= (int) $student['id'] ?>">
                                                     <button class="rounded-full border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50">Reset pass</button>
                                                 </form>
                                             <?php endif; ?>
                                             <form method="post" action="<?= appBaseUrl() ?>/modules/students/index.php" class="inline" onsubmit="return confirm('Delete this student and their login?');">
+                                                <?= csrfField() ?>
                                                 <input type="hidden" name="action" value="delete">
                                                 <input type="hidden" name="student_id" value="<?= (int) $student['id'] ?>">
                                                 <button class="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Delete</button>

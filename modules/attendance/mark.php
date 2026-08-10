@@ -28,6 +28,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $classFilter = trim($_POST['class_filter'] ?? '');
 
         try {
+            if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+                throw new RuntimeException('Invalid request. Please refresh and try again.');
+            }
             saveAttendance($sessionId, $statuses);
 
             $feeHeadId = $headId;
@@ -124,6 +127,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php endif; ?>
 
             <form method="post" action="<?= appBaseUrl() ?>/modules/attendance/mark.php?id=<?= $sessionId ?>">
+                <?= csrfField() ?>
                 <input type="hidden" name="action" value="save">
 
                 <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">

@@ -12,6 +12,9 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
+        if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+            throw new RuntimeException('Invalid request. Please refresh and try again.');
+        }
         if ($action === 'add') {
             $name = trim($_POST['name'] ?? '');
             if ($name === '') throw new RuntimeException('Name is required.');
@@ -69,6 +72,7 @@ require_once __DIR__ . '/../includes/header.php';
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Add <?= strtolower($entity) ?></h2>
                 <form class="mt-4 flex gap-3" method="post">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="add">
                     <input type="text" name="name" placeholder="<?= $entity ?> name" class="flex-1 rounded-xl border border-emerald-200 px-3 py-2" required>
                     <button class="rounded-full bg-emerald-700 px-6 py-2.5 font-semibold text-white">Add</button>
@@ -78,6 +82,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <div class="inline-flex items-center gap-3 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm">
                             <span class="font-semibold text-slate-800"><?= htmlspecialchars($row['name']) ?></span>
                             <form method="post" onsubmit="return confirm('Delete <?= htmlspecialchars($row['name']) ?>?');">
+                                <?= csrfField() ?>
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="id" value="<?= (int) $row['id'] ?>">
                                 <button class="text-xs font-semibold text-red-500 hover:underline">✕</button>

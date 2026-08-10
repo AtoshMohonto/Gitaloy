@@ -16,11 +16,15 @@ $success = null;
 $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    foreach ($defaults as $key => $default) {
-        saveSetting($key, trim($_POST[$key] ?? $default));
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } else {
+        foreach ($defaults as $key => $default) {
+            saveSetting($key, trim($_POST[$key] ?? $default));
+        }
+        logActivity('Updated site settings', 'settings');
+        $success = 'Site settings saved successfully.';
     }
-    logActivity('Updated site settings', 'settings');
-    $success = 'Site settings saved successfully.';
 }
 
 $settings = getSettings();
@@ -55,6 +59,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     <p class="ml-auto text-xs font-medium text-slate-400">Shown across the whole system</p>
                 </header>
                 <form method="post" class="p-5 space-y-4">
+                    <?= csrfField() ?>
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" for="app_name">Application name</label>

@@ -16,37 +16,41 @@ $teacherCenterId = $isTeacher ? (int) ($user['center_id'] ?? 0) : null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'create') {
-        $centerId = (int) ($_POST['center_id'] ?? 0);
-        $sessionDate = trim($_POST['session_date'] ?? '');
-        $type = $_POST['type'] ?? 'Friday';
-        $notes = trim($_POST['notes'] ?? '');
+    if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please refresh and try again.';
+    } else {
+        if ($action === 'create') {
+            $centerId = (int) ($_POST['center_id'] ?? 0);
+            $sessionDate = trim($_POST['session_date'] ?? '');
+            $type = $_POST['type'] ?? 'Friday';
+            $notes = trim($_POST['notes'] ?? '');
 
-        if ($centerId <= 0 || $sessionDate === '') {
-            $error = 'Center and session date are required.';
-        } elseif ($isTeacher && $centerId !== $teacherCenterId) {
-            $error = 'You can only create sessions at your own center.';
-        } else {
-            $sessionId = createSession([
-                'center_id' => $centerId,
-                'year_id' => activeYearId(),
-                'teacher_id' => (int) $_SESSION['user_id'],
-                'session_date' => $sessionDate,
-                'type' => $type,
-                'notes' => $notes !== '' ? $notes : null,
-            ]);
-            $success = 'Session created. Now mark attendance.';
-            logActivity('Created attendance session on ' . $sessionDate, 'attendance');
-            header('Location: ' . appBaseUrl() . '/modules/attendance/mark.php?id=' . $sessionId);
-            exit;
+            if ($centerId <= 0 || $sessionDate === '') {
+                $error = 'Center and session date are required.';
+            } elseif ($isTeacher && $centerId !== $teacherCenterId) {
+                $error = 'You can only create sessions at your own center.';
+            } else {
+                $sessionId = createSession([
+                    'center_id' => $centerId,
+                    'year_id' => activeYearId(),
+                    'teacher_id' => (int) $_SESSION['user_id'],
+                    'session_date' => $sessionDate,
+                    'type' => $type,
+                    'notes' => $notes !== '' ? $notes : null,
+                ]);
+                $success = 'Session created. Now mark attendance.';
+                logActivity('Created attendance session on ' . $sessionDate, 'attendance');
+                header('Location: ' . appBaseUrl() . '/modules/attendance/mark.php?id=' . $sessionId);
+                exit;
+            }
         }
-    }
 
-    if ($action === 'delete') {
-        $sessionId = (int) ($_POST['session_id'] ?? 0);
-        deleteSession($sessionId);
-        $success = 'Session deleted.';
-        logActivity('Deleted attendance session #' . $sessionId, 'attendance');
+        if ($action === 'delete') {
+            $sessionId = (int) ($_POST['session_id'] ?? 0);
+            deleteSession($sessionId);
+            $success = 'Session deleted.';
+            logActivity('Deleted attendance session #' . $sessionId, 'attendance');
+        }
     }
 }
 
@@ -89,6 +93,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Create a session</h2>
                 <form class="mt-4 grid gap-4 md:grid-cols-5" method="post" action="<?= appBaseUrl() ?>/modules/attendance/index.php">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="create">
                     <div>
                         <label class="mb-1 block text-sm font-medium">Center</label>
@@ -173,6 +178,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                         <div class="flex flex-wrap gap-2">
                                             <a href="<?= appBaseUrl() ?>/modules/attendance/mark.php?id=<?= (int) $session['id'] ?>" class="rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white">Mark / View</a>
                                             <form method="post" action="<?= appBaseUrl() ?>/modules/attendance/index.php" onsubmit="return confirm('Delete this session and its attendance?');">
+                                                <?= csrfField() ?>
                                                 <input type="hidden" name="action" value="delete">
                                                 <input type="hidden" name="session_id" value="<?= (int) $session['id'] ?>">
                                                 <button class="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Delete</button>

@@ -12,6 +12,9 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
+        if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+            throw new RuntimeException('Invalid request. Please refresh and try again.');
+        }
         if ($action === 'add_division') {
             $name = trim($_POST['name'] ?? '');
             if ($name === '') throw new RuntimeException('Division name is required.');
@@ -89,6 +92,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                     <h2 class="text-xl font-semibold text-slate-900">Add division</h2>
                     <form class="mt-4 flex gap-3" method="post">
+                        <?= csrfField() ?>
                         <input type="hidden" name="action" value="add_division">
                         <input type="text" name="name" placeholder="e.g. Rajshahi" class="flex-1 rounded-xl border border-emerald-200 px-3 py-2" required>
                         <button class="rounded-full bg-emerald-700 px-5 py-2 font-semibold text-white">Add</button>
@@ -115,6 +119,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </h2>
                     <?php if ($selectedDivisionId > 0): ?>
                         <form class="mt-4 flex gap-3" method="post">
+                            <?= csrfField() ?>
                             <input type="hidden" name="action" value="add_district">
                             <input type="hidden" name="division_id" value="<?= $selectedDivisionId ?>">
                             <input type="text" name="name" placeholder="e.g. Joypurhat" class="flex-1 rounded-xl border border-emerald-200 px-3 py-2" required>
@@ -140,6 +145,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <h2 class="text-xl font-semibold text-slate-900">Upazilas</h2>
                     <?php if ($selectedDistrictId > 0): ?>
                         <form class="mt-4 flex gap-3" method="post">
+                            <?= csrfField() ?>
                             <input type="hidden" name="action" value="add_upazila">
                             <input type="hidden" name="district_id" value="<?= $selectedDistrictId ?>">
                             <input type="text" name="name" placeholder="e.g. Kalai" class="flex-1 rounded-xl border border-emerald-200 px-3 py-2" required>
@@ -165,6 +171,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <h2 class="text-xl font-semibold text-slate-900">Villages</h2>
                     <?php if ($selectedUpazilaId > 0): ?>
                         <form class="mt-4 flex gap-3" method="post">
+                            <?= csrfField() ?>
                             <input type="hidden" name="action" value="add_village">
                             <input type="hidden" name="upazila_id" value="<?= $selectedUpazilaId ?>">
                             <input type="text" name="name" placeholder="e.g. Gitaloy" class="flex-1 rounded-xl border border-emerald-200 px-3 py-2" required>
@@ -175,6 +182,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div class="flex items-center justify-between rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm">
                                     <span class="text-slate-700"><?= htmlspecialchars($village['name']) ?></span>
                                     <form method="post" onsubmit="return confirm('Delete this village?');">
+                                        <?= csrfField() ?>
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="table" value="villages">
                                         <input type="hidden" name="id" value="<?= (int) $village['id'] ?>">

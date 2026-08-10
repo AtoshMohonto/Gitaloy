@@ -12,6 +12,9 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
+        if (!validateCsrf($_POST['csrf_token'] ?? null)) {
+            throw new RuntimeException('Invalid request. Please refresh and try again.');
+        }
         if ($action === 'add') {
             $name = trim($_POST['name'] ?? '');
             $start = trim($_POST['start_date'] ?? '');
@@ -67,6 +70,7 @@ require_once __DIR__ . '/../includes/header.php';
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Add year</h2>
                 <form class="mt-4 grid gap-4 md:grid-cols-3" method="post">
+                    <?= csrfField() ?>
                     <input type="hidden" name="action" value="add">
                     <input type="text" name="name" placeholder="e.g. 2026-2027" class="rounded-xl border border-emerald-200 px-3 py-2" required>
                     <input type="date" name="start_date" class="rounded-xl border border-emerald-200 px-3 py-2">
@@ -97,12 +101,14 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="flex gap-2">
                                 <?php if (!$year['is_active']): ?>
                                     <form method="post" onsubmit="return confirm('Set <?= htmlspecialchars($year['name']) ?> as the active year?');">
+                                        <?= csrfField() ?>
                                         <input type="hidden" name="action" value="activate">
                                         <input type="hidden" name="id" value="<?= (int) $year['id'] ?>">
                                         <button class="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-semibold text-white">Set active</button>
                                     </form>
                                 <?php endif; ?>
                                 <form method="post" onsubmit="return confirm('Delete this year? Existing records are kept.');">
+                                    <?= csrfField() ?>
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="id" value="<?= (int) $year['id'] ?>">
                                     <button class="rounded-full border border-red-200 px-4 py-1.5 text-xs font-semibold text-red-600">Delete</button>

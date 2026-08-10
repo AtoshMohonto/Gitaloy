@@ -85,6 +85,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <td class="px-3 py-3 text-slate-500 text-xs"><?= htmlspecialchars($user['created_at']) ?></td>
                                         <td class="px-3 py-3 text-right">
                                             <form method="post" action="<?= appBaseUrl() ?>/admin/users.php">
+                                                <?= csrfField() ?>
                                                 <input type="hidden" name="action" value="toggle">
                                                 <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
                                                 <button class="rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white">Approve</button>
