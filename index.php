@@ -75,7 +75,11 @@ require_once __DIR__ . '/includes/header.php';
                     <?php else: ?>
                         <div class="grid h-64 w-full place-items-center rounded-2xl border border-emerald-500/20 bg-emerald-500/5 shadow-2xl sm:h-80 lg:h-96">
                             <div class="text-center">
-                                <span class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-emerald-500/15 text-3xl">🌾</span>
+                                <?php if (!empty($settings['site_logo'])): ?>
+                                    <img src="<?= $base ?>/<?= htmlspecialchars($settings['site_logo']) ?>" alt="Gitaloy logo" class="mx-auto h-20 w-20 rounded-2xl object-cover shadow-xl ring-2 ring-emerald-500/30">
+                                <?php else: ?>
+                                    <span class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-emerald-500/15 text-3xl">🌾</span>
+                                <?php endif; ?>
                                 <p class="mt-4 text-sm font-bold text-emerald-100">Gitaloy</p>
                                 <p class="mt-1 text-xs text-emerald-200/60">A picture can be added from Admin → Frontend Content.</p>
                             </div>
@@ -92,6 +96,26 @@ require_once __DIR__ . '/includes/header.php';
                     <div>
                         <p class="text-xs font-bold uppercase tracking-widest text-amber-600">Notice</p>
                         <p class="mt-1 whitespace-pre-line text-sm leading-relaxed text-amber-900"><?= htmlspecialchars($notice) ?></p>
+                    </div>
+                </div>
+            </section>
+        <?php endif; ?>
+
+        <?php
+        $weeklyProgramTitle = $settings['weekly_program_title'] ?? 'Weekly Programs';
+        $weeklyProgramBody = $settings['weekly_program_body'] ?? '';
+        $weeklyProgramActive = ($settings['weekly_program_active'] ?? '0') === '1';
+        ?>
+        <?php if ($weeklyProgramActive && trim($weeklyProgramBody) !== ''): ?>
+            <section class="mx-auto max-w-7xl px-6 pt-8 sm:px-8">
+                <div class="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm sm:p-8">
+                    <div class="flex items-start gap-4">
+                        <span class="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white"><i data-lucide="calendar-days" class="h-5 w-5"></i></span>
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-widest text-emerald-600">Weekly programs</p>
+                            <h2 class="mt-1 text-xl font-extrabold text-slate-900 sm:text-2xl"><?= htmlspecialchars($weeklyProgramTitle) ?></h2>
+                            <p class="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600"><?= htmlspecialchars($weeklyProgramBody) ?></p>
+                        </div>
                     </div>
                 </div>
             </section>

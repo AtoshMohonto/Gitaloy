@@ -7,7 +7,7 @@ requireAuth();
 $pdo = getDbConnection();
 $userId = (int) currentUser()['id'];
 
-$stmt = $pdo->prepare('SELECT id, name, username, email, phone, role_id FROM users WHERE id = ?');
+$stmt = $pdo->prepare('SELECT id, name, username, email, phone, role_id, photo FROM users WHERE id = ?');
 $stmt->execute([$userId]);
 $user = $stmt->fetch();
 
@@ -32,14 +32,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($name === '') {
             $error = 'Name is required.';
         } else {
-            $stmt = $pdo->prepare('UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?');
-            $stmt->execute([$name, $email !== '' ? $email : null, $phone !== '' ? $phone : null, $userId]);
-            $_SESSION['name'] = $name;
-            logActivity('Updated own profile', 'account');
-            $success = 'Profile updated.';
-            $user['name'] = $name;
-            $user['email'] = $email;
-            $user['phone'] = $phone;
+            $photo = $user['photo'] ?? null;
+            if (isset($_POST['remove_photo'])) {
+                $photo = null;
+            } elseif (!empty($_FILES['photo']['name'])) {
+                try {
+                    $photo = handlePhotoUpload($_FILES['photo']);
+                } catch (RuntimeException $e) {
+                    $error = $e->getMessage();
+                }
+            }
+
+            if ($error === null) {
+                $stmt = $pdo->prepare('UPDATE users SET name = ?, email = ?, phone = ?, photo = ? WHERE id = ?');
+                $stmt->execute([$name, $email !== '' ? $email : null, $phone !== '' ? $phone : null, $photo, $userId]);
+                $_SESSION['name'] = $name;
+                if (isStudent()) {
+                    $pdo->prepare('UPDATE students SET photo = ? WHERE user_id = ?')->execute([$photo, $userId]);
+                }
+                logActivity('Updated own profile', 'account');
+                $success = 'Profile updated.';
+                $user['name'] = $name;
+                $user['email'] = $email;
+                $user['phone'] = $phone;
+                $user['photo'] = $photo;
+            }
         }
     } elseif ($action === 'password') {
         $current = $_POST['current_password'] ?? '';
@@ -95,9 +112,13 @@ require_once __DIR__ . '/../../includes/header.php';
                 <div class="lg:col-span-1">
                     <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                         <div class="flex items-center gap-4">
-                            <span class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-xl font-extrabold text-emerald-700">
-                                <?= htmlspecialchars(strtoupper(substr($user['name'], 0, 1))) ?>
-                            </span>
+                            <?php if (!empty($user['photo'])): ?>
+                                <img src="<?= appBaseUrl() ?>/<?= htmlspecialchars($user['photo']) ?>" alt="" class="h-14 w-14 shrink-0 rounded-2xl border border-emerald-100 object-cover">
+                            <?php else: ?>
+                                <span class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-xl font-extrabold text-emerald-700">
+                                    <?= htmlspecialchars(strtoupper(substr($user['name'], 0, 1))) ?>
+                                </span>
+                            <?php endif; ?>
                             <div class="min-w-0">
                                 <p class="truncate text-base font-bold text-slate-900"><?= htmlspecialchars($user['name']) ?></p>
                                 <p class="text-sm font-semibold text-emerald-600"><?= htmlspecialchars($_SESSION['role_name'] ?? roleName((int) $user['role_id'])) ?></p>
@@ -125,7 +146,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         <header class="flex flex-wrap items-center gap-2 border-b border-emerald-100 px-5 py-4">
                             <h2 class="text-base font-bold text-slate-800">Profile information</h2>
                         </header>
-                        <form method="post" class="p-5 space-y-4">
+                        <form method="post" class="p-5 space-y-4" enctype="multipart/form-data">
                             <?= csrfField() ?>
                             <input type="hidden" name="action" value="profile">
                             <div class="grid gap-4 md:grid-cols-2">
@@ -140,6 +161,18 @@ require_once __DIR__ . '/../../includes/header.php';
                                 <div>
                                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" for="phone">Phone</label>
                                     <input id="phone" name="phone" type="text" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100">
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" for="photo">Profile photo (JPG)</label>
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <input id="photo" name="photo" type="file" accept="image/jpeg,.jpg,.jpeg" class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm text-slate-500">
+                                        <?php if (!empty($user['photo'])): ?>
+                                            <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                                <input type="checkbox" name="remove_photo" value="1" class="rounded border-emerald-300 text-emerald-700 focus:ring-emerald-200">
+                                                Remove photo
+                                            </label>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                             </div>
                             <div class="flex items-center justify-end gap-2 border-t border-emerald-100 pt-4">

@@ -80,6 +80,11 @@ $showOps = $isStaff || hasAnyPermission(['students.view', 'attendance.view', 'fe
                     <i data-lucide="file-text" class="h-4 w-4 <?= navActive(['/reports/']) ? 'text-white' : 'text-emerald-400' ?>"></i><span class="sidebar-label">Reports</span>
                 </a>
                 <?php endif; ?>
+                <?php if (hasPermission('updates.view')): ?>
+                <a href="<?= $base ?>/modules/updates/index.php" class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold <?= navActive(['/updates/']) ? 'bg-emerald-600 text-white' : 'text-emerald-100 hover:bg-emerald-900 hover:text-white' ?>">
+                    <i data-lucide="megaphone" class="h-4 w-4 <?= navActive(['/updates/']) ? 'text-white' : 'text-emerald-400' ?>"></i><span class="sidebar-label">Class Updates</span>
+                </a>
+                <?php endif; ?>
             </div>
         </div>
         <?php endif; ?>

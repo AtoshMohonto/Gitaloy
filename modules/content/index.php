@@ -14,6 +14,11 @@ $defaults = [
     'hero_image' => '',
     'notice' => '',
     'notice_active' => '1',
+    'weekly_program_title' => 'Weekly Programs',
+    'weekly_program_body' => '',
+    'weekly_program_active' => '0',
+    'site_logo' => '',
+    'site_favicon' => '',
 ];
 
 $success = null;
@@ -25,11 +30,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     } else {
         $current = getSettings();
         foreach ($defaults as $key => $default) {
-            if ($key === 'hero_image') {
+            if (in_array($key, ['hero_image', 'site_logo', 'site_favicon'], true)) {
                 continue;
             }
             if ($key === 'notice_active') {
                 saveSetting($key, isset($_POST['notice_active']) ? '1' : '0');
+                continue;
+            }
+            if ($key === 'weekly_program_active') {
+                saveSetting($key, isset($_POST['weekly_program_active']) ? '1' : '0');
                 continue;
             }
             saveSetting($key, trim($_POST[$key] ?? ($current[$key] ?? $default)));
@@ -54,6 +63,36 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     saveSetting('hero_image', 'uploads/' . $name);
                 } else {
                     $error = 'The picture could not be uploaded.';
+                }
+            }
+        }
+
+        $imageSettings = [
+            'site_logo' => ['label' => 'logo', 'desc' => 'Site logo'],
+            'site_favicon' => ['label' => 'favicon', 'desc' => 'Site favicon'],
+        ];
+        foreach ($imageSettings as $settingKey => $info) {
+            $fileKey = $info['label'];
+            if (isset($_POST['remove_' . $fileKey])) {
+                saveSetting($settingKey, '');
+            }
+            if (!empty($_FILES[$fileKey]['name'])) {
+                $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif', 'image/x-icon' => 'ico', 'image/vnd.microsoft.icon' => 'ico'];
+                $mime = $_FILES[$fileKey]['type'];
+                if (!isset($allowed[$mime])) {
+                    $error = $info['desc'] . ' must be a JPG, PNG, WebP, GIF or ICO image.';
+                    continue;
+                }
+                $upDir = dirname(__DIR__, 2) . '/uploads';
+                if (!is_dir($upDir)) {
+                    @mkdir($upDir, 0777, true);
+                }
+                $ext = $allowed[$mime];
+                $name = $fileKey . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                if (is_dir($upDir) && move_uploaded_file($_FILES[$fileKey]['tmp_name'], $upDir . '/' . $name)) {
+                    saveSetting($settingKey, 'uploads/' . $name);
+                } else {
+                    $error = 'The ' . $info['desc'] . ' could not be uploaded.';
                 }
             }
         }
@@ -128,6 +167,45 @@ require_once __DIR__ . '/../../includes/header.php';
 
                 <section class="rounded-2xl border border-emerald-100 bg-white shadow-sm">
                     <header class="flex flex-wrap items-center gap-2 border-b border-emerald-100 px-5 py-4">
+                        <h2 class="text-base font-bold text-slate-800">Site identity</h2>
+                        <p class="ml-auto text-xs font-medium text-slate-400">Logo shown in the header, favicon in the browser tab</p>
+                    </header>
+                    <div class="p-5 space-y-5">
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Site logo</label>
+                            <div class="flex flex-wrap items-center gap-4">
+                                <?php if (!empty($settings['site_logo'])): ?>
+                                    <img src="<?= appBaseUrl() ?>/<?= htmlspecialchars($settings['site_logo']) ?>" alt="Current site logo" class="h-16 w-16 rounded-xl border border-emerald-100 object-cover">
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                        <input type="checkbox" name="remove_logo" value="1" class="rounded border-emerald-300 text-emerald-700 focus:ring-emerald-200">
+                                        Remove current logo
+                                    </label>
+                                <?php else: ?>
+                                    <p class="text-xs text-slate-400">No logo yet — the default 🌾 emblem is used.</p>
+                                <?php endif; ?>
+                                <input type="file" name="logo" accept="image/jpeg,image/png,image/webp,image/gif" class="rounded-xl border border-emerald-200 px-3 py-2 text-sm text-slate-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Site favicon</label>
+                            <div class="flex flex-wrap items-center gap-4">
+                                <?php if (!empty($settings['site_favicon'])): ?>
+                                    <img src="<?= appBaseUrl() ?>/<?= htmlspecialchars($settings['site_favicon']) ?>" alt="Current favicon" class="h-10 w-10 rounded-lg border border-emerald-100 object-cover">
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                        <input type="checkbox" name="remove_favicon" value="1" class="rounded border-emerald-300 text-emerald-700 focus:ring-emerald-200">
+                                        Remove current favicon
+                                    </label>
+                                <?php else: ?>
+                                    <p class="text-xs text-slate-400">No favicon yet — upload a small square image (PNG/ICO recommended).</p>
+                                <?php endif; ?>
+                                <input type="file" name="favicon" accept="image/jpeg,image/png,image/webp,image/gif,image/x-icon,.ico" class="rounded-xl border border-emerald-200 px-3 py-2 text-sm text-slate-500">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rounded-2xl border border-emerald-100 bg-white shadow-sm">
+                    <header class="flex flex-wrap items-center gap-2 border-b border-emerald-100 px-5 py-4">
                         <h2 class="text-base font-bold text-slate-800">Notice board</h2>
                         <p class="ml-auto text-xs font-medium text-slate-400">Shown on the landing page</p>
                     </header>
@@ -140,6 +218,28 @@ require_once __DIR__ . '/../../includes/header.php';
                         <label class="inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
                             <input type="checkbox" name="notice_active" value="1" <?= (($settings['notice_active'] ?? $defaults['notice_active']) === '1') ? 'checked' : '' ?> class="rounded border-emerald-300 text-emerald-700 focus:ring-emerald-200">
                             Show the notice on the landing page
+                        </label>
+                    </div>
+                </section>
+
+                <section class="rounded-2xl border border-emerald-100 bg-white shadow-sm">
+                    <header class="flex flex-wrap items-center gap-2 border-b border-emerald-100 px-5 py-4">
+                        <h2 class="text-base font-bold text-slate-800">Weekly programs</h2>
+                        <p class="ml-auto text-xs font-medium text-slate-400">Shown on the landing page</p>
+                    </header>
+                    <div class="p-5 space-y-4">
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" for="weekly_program_title">Section heading</label>
+                            <input id="weekly_program_title" name="weekly_program_title" type="text" value="<?= htmlspecialchars($settings['weekly_program_title'] ?? $defaults['weekly_program_title']) ?>" class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" for="weekly_program_body">Content</label>
+                            <textarea id="weekly_program_body" name="weekly_program_body" rows="4" class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"><?= htmlspecialchars($settings['weekly_program_body'] ?? '') ?></textarea>
+                            <p class="mt-1 text-xs text-slate-400">Describe the weekly program schedule and activities. Leave empty to hide the section.</p>
+                        </div>
+                        <label class="inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
+                            <input type="checkbox" name="weekly_program_active" value="1" <?= (($settings['weekly_program_active'] ?? $defaults['weekly_program_active']) === '1') ? 'checked' : '' ?> class="rounded border-emerald-300 text-emerald-700 focus:ring-emerald-200">
+                            Show weekly programs on the landing page
                         </label>
                     </div>
                 </section>

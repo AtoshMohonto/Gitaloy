@@ -118,8 +118,8 @@ function createStudent(array $data): int
 {
     $pdo = getDbConnection();
     $stmt = $pdo->prepare(
-        'INSERT INTO students (student_id, name, guardian_name, guardian_phone, dob, gender, village_id, center_id, class_id, admission_date, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO students (student_id, name, guardian_name, guardian_phone, dob, gender, village_id, center_id, class_id, admission_date, status, photo)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
         $data['student_id'],
@@ -133,6 +133,7 @@ function createStudent(array $data): int
         $data['class_id'],
         $data['admission_date'],
         $data['status'],
+        $data['photo'] ?? null,
     ]);
     return (int) $pdo->lastInsertId();
 }
@@ -142,7 +143,7 @@ function updateStudent(int $id, array $data): bool
     $pdo = getDbConnection();
     $stmt = $pdo->prepare(
         'UPDATE students SET name = ?, guardian_name = ?, guardian_phone = ?, dob = ?, gender = ?,
-                village_id = ?, center_id = ?, class_id = ?, admission_date = ?, status = ?
+                village_id = ?, center_id = ?, class_id = ?, admission_date = ?, status = ?, photo = ?
          WHERE id = ?'
     );
     return $stmt->execute([
@@ -156,6 +157,7 @@ function updateStudent(int $id, array $data): bool
         $data['class_id'],
         $data['admission_date'],
         $data['status'],
+        $data['photo'] ?? null,
         $id,
     ]);
 }
@@ -286,4 +288,264 @@ function getStudentFeeSummary(int $studentId, ?int $yearId = null): array
     $row = $stmt->fetch() ?: ['billed' => 0, 'paid' => 0, 'records' => 0];
     $row['due'] = round((float) $row['billed'] - (float) $row['paid'], 2);
     return $row;
+}
+
+/**
+ * Returns true when the given center is inside the current user's zone scope.
+ */
+function centerInScope(int $centerId): bool
+{
+    $pdo = getDbConnection();
+    $filter = getCenterScopeFilter('c');
+    $joins = getCenterScopeJoins('c');
+    $stmt = $pdo->prepare("SELECT c.id FROM centers c $joins WHERE c.id = ? AND $filter");
+    $stmt->execute([$centerId]);
+    return $stmt->fetch() !== false;
+}
+
+/**
+ * Reads an uploaded CSV file into a 2D array of rows.
+ */
+function readCsvRows(array $file): array
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Please choose a CSV file to upload.');
+    }
+    if ((int) ($file['size'] ?? 0) > 2097152) {
+        throw new RuntimeException('CSV file is too large. Maximum size is 2 MB.');
+    }
+    $handle = fopen($file['tmp_name'], 'r');
+    if ($handle === false) {
+        throw new RuntimeException('Could not read the uploaded CSV file.');
+    }
+    $rows = [];
+    while (($row = fgetcsv($handle)) !== false) {
+        $rows[] = $row;
+    }
+    fclose($handle);
+    return $rows;
+}
+
+/**
+ * Normalizes a CSV header cell for flexible column matching.
+ * Example: "Date of Birth (YYYY-MM-DD)" -> "date_of_birth"
+ */
+function normalizeCsvHeader(string $header): string
+{
+    $header = str_replace("\xEF\xBB\xBF", '', $header);
+    $header = strtolower(trim($header));
+    $header = preg_replace('/\([^)]*\)/', '', $header);
+    $header = preg_replace('/[^a-z0-9]+/', '_', $header);
+    return trim($header, '_');
+}
+
+/**
+ * Finds the index of a column given acceptable alias names, or null.
+ */
+function csvColumnIndex(array $headers, array $aliases): ?int
+{
+    foreach ($aliases as $alias) {
+        $index = array_search($alias, $headers, true);
+        if ($index !== false) {
+            return $index;
+        }
+    }
+    return null;
+}
+
+/**
+ * Imports students from parsed CSV rows.
+ *
+ * $context keys:
+ *   - is_teacher: bool
+ *   - teacher_center_id: int (teacher's current center id)
+ *
+ * Returns ['added' => int, 'added_names' => array, 'errors' => array].
+ */
+function importStudentsFromCsv(array $rows, array $context = []): array
+{
+    $pdo = getDbConnection();
+    $result = ['added' => 0, 'added_names' => [], 'errors' => []];
+
+    if (count($rows) < 2) {
+        throw new RuntimeException('The CSV must have a header row followed by at least one student row.');
+    }
+    if (count($rows) - 1 > 500) {
+        throw new RuntimeException('Too many rows. A single import is limited to 500 students.');
+    }
+
+    $headers = array_map('normalizeCsvHeader', array_map('strval', $rows[0]));
+    $col = [
+        'name' => csvColumnIndex($headers, ['name', 'student_name', 'studentname']),
+        'guardian_name' => csvColumnIndex($headers, ['guardian_name', 'guardian', 'parent_name', 'parentname', 'father_name']),
+        'guardian_phone' => csvColumnIndex($headers, ['guardian_phone', 'guardianphone', 'phone', 'guardian_mobile', 'mobile']),
+        'dob' => csvColumnIndex($headers, ['dob', 'date_of_birth', 'birth_date', 'birthdate']),
+        'gender' => csvColumnIndex($headers, ['gender', 'sex']),
+        'village' => csvColumnIndex($headers, ['village', 'village_name', 'villagename']),
+        'center' => csvColumnIndex($headers, ['center', 'centre', 'center_name', 'centrename', 'study_center']),
+        'class' => csvColumnIndex($headers, ['class', 'class_name', 'classname', 'grade']),
+        'admission_date' => csvColumnIndex($headers, ['admission_date', 'admissiondate', 'admission']),
+        'status' => csvColumnIndex($headers, ['status']),
+    ];
+
+    if ($col['name'] === null) {
+        throw new RuntimeException('The CSV must contain a "Name" column. Use the demo template to see the expected format.');
+    }
+
+    $isTeacher = (bool) ($context['is_teacher'] ?? false);
+    $teacherCenterId = (int) ($context['teacher_center_id'] ?? 0);
+
+    $villageByName = [];
+    foreach (getVillages() as $village) {
+        $villageByName[strtolower($village['name'])] = (int) $village['id'];
+    }
+    $classByName = [];
+    foreach (getClasses() as $class) {
+        $classByName[strtolower($class['name'])] = (int) $class['id'];
+    }
+    $centerByName = [];
+    foreach (getCenters() as $center) {
+        $centerByName[strtolower($center['name'])] = (int) $center['id'];
+    }
+
+    $teacherCenterName = '';
+    if ($isTeacher && $teacherCenterId > 0) {
+        $stmt = $pdo->prepare('SELECT name FROM centers WHERE id = ?');
+        $stmt->execute([$teacherCenterId]);
+        $teacherCenterName = (string) ($stmt->fetchColumn() ?: '');
+    }
+
+    for ($i = 1, $n = count($rows); $i < $n; $i++) {
+        $row = $rows[$i];
+        $rowNo = $i + 1;
+        $cell = function (string $key) use ($row, $col) {
+            $index = $col[$key];
+            return $index !== null && isset($row[$index]) ? trim((string) $row[$index]) : '';
+        };
+
+        $name = $cell('name');
+        if ($name === '') {
+            $result['errors'][] = "Row $rowNo: Name is required.";
+            continue;
+        }
+
+        $centerId = 0;
+        $centerName = $cell('center');
+        if ($isTeacher) {
+            if ($centerName !== '' && $teacherCenterName !== '' && strtolower($centerName) !== strtolower($teacherCenterName)) {
+                $result['errors'][] = "Row $rowNo: You can only add students to your own center (" . $teacherCenterName . ').';
+                continue;
+            }
+            $centerId = $teacherCenterId;
+        } else {
+            if ($centerName === '') {
+                $result['errors'][] = "Row $rowNo: Center is required.";
+                continue;
+            }
+            $centerKey = strtolower($centerName);
+            if (!isset($centerByName[$centerKey])) {
+                $result['errors'][] = "Row $rowNo: Center '" . $centerName . "' not found.";
+                continue;
+            }
+            $centerId = $centerByName[$centerKey];
+            if (!centerInScope($centerId)) {
+                $result['errors'][] = "Row $rowNo: Center '" . $centerName . "' is outside your area.";
+                continue;
+            }
+        }
+
+        $villageId = null;
+        $villageName = $cell('village');
+        if ($villageName !== '') {
+            $villageKey = strtolower($villageName);
+            if (!isset($villageByName[$villageKey])) {
+                $result['errors'][] = "Row $rowNo: Village '" . $villageName . "' not found.";
+                continue;
+            }
+            $villageId = $villageByName[$villageKey];
+        }
+
+        $classId = null;
+        $className = $cell('class');
+        if ($className !== '') {
+            $classKey = strtolower($className);
+            if (!isset($classByName[$classKey])) {
+                $result['errors'][] = "Row $rowNo: Class '" . $className . "' not found.";
+                continue;
+            }
+            $classId = $classByName[$classKey];
+        }
+
+        $gender = null;
+        $genderRaw = $cell('gender');
+        if ($genderRaw !== '') {
+            $g = strtolower($genderRaw);
+            if ($g === 'male' || $g === 'm') {
+                $gender = 'Male';
+            } elseif ($g === 'female' || $g === 'f') {
+                $gender = 'Female';
+            } else {
+                $result['errors'][] = "Row $rowNo: Gender must be Male or Female.";
+                continue;
+            }
+        }
+
+        $dob = null;
+        $dobRaw = $cell('dob');
+        if ($dobRaw !== '') {
+            if (!isValidDateString($dobRaw)) {
+                $result['errors'][] = "Row $rowNo: Date of birth must be in YYYY-MM-DD format.";
+                continue;
+            }
+            $dob = $dobRaw;
+        }
+
+        $admissionDate = $cell('admission_date') !== '' ? $cell('admission_date') : date('Y-m-d');
+        if (!isValidDateString($admissionDate)) {
+            $result['errors'][] = "Row $rowNo: Admission date must be in YYYY-MM-DD format.";
+            continue;
+        }
+
+        $status = 'Active';
+        $statusRaw = $cell('status');
+        if ($statusRaw !== '') {
+            $s = strtolower($statusRaw);
+            if (in_array($s, ['active', 'a', '1'], true)) {
+                $status = 'Active';
+            } elseif (in_array($s, ['inactive', 'i', '0'], true)) {
+                $status = 'Inactive';
+            } else {
+                $result['errors'][] = "Row $rowNo: Status must be Active or Inactive.";
+                continue;
+            }
+        }
+
+        try {
+            createStudent([
+                'student_id' => nextStudentId(),
+                'name' => $name,
+                'guardian_name' => $cell('guardian_name') !== '' ? $cell('guardian_name') : null,
+                'guardian_phone' => $cell('guardian_phone') !== '' ? $cell('guardian_phone') : null,
+                'dob' => $dob,
+                'gender' => $gender,
+                'village_id' => $villageId,
+                'center_id' => $centerId,
+                'class_id' => $classId,
+                'admission_date' => $admissionDate,
+                'status' => $status,
+            ]);
+            $result['added']++;
+            $result['added_names'][] = $name;
+        } catch (Throwable $e) {
+            $result['errors'][] = "Row $rowNo: Could not save ($name): " . $e->getMessage();
+        }
+    }
+
+    return $result;
+}
+
+function isValidDateString(string $value): bool
+{
+    $date = DateTime::createFromFormat('Y-m-d', $value);
+    return $date !== false && $date->format('Y-m-d') === $value;
 }

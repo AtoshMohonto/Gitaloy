@@ -1,12 +1,23 @@
 <?php
 require_once __DIR__ . '/auth.php';
 $base = appBaseUrl();
+if (function_exists('getSettings')) {
+    $hdrSettings = getSettings();
+    $siteLogo = $hdrSettings['site_logo'] ?? '';
+    $siteFavicon = $hdrSettings['site_favicon'] ?? '';
+} else {
+    $siteLogo = '';
+    $siteFavicon = '';
+}
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($pageTitle ?? 'Gitaloy — Village Student Management') ?></title>
+    <?php if ($siteFavicon !== ''): ?>
+        <link rel="icon" href="<?= $base ?>/<?= htmlspecialchars($siteFavicon) ?>">
+    <?php endif; ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -27,7 +38,11 @@ $base = appBaseUrl();
                     </button>
                 <?php endif; ?>
                 <a href="<?= $base ?>/<?= !empty($_SESSION['user_id']) ? 'modules/dashboard/index.php' : 'index.php' ?>" class="flex min-w-0 items-center gap-2.5">
-                    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-900 text-lg">🌾</span>
+                    <?php if ($siteLogo !== ''): ?>
+                        <img src="<?= $base ?>/<?= htmlspecialchars($siteLogo) ?>" alt="Site logo" class="h-9 w-9 shrink-0 rounded-xl border border-emerald-100 object-cover">
+                    <?php else: ?>
+                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-900 text-lg">🌾</span>
+                    <?php endif; ?>
                     <span class="min-w-0">
                         <span class="block truncate text-sm font-extrabold text-slate-900">Gitaloy</span>
                         <span class="block truncate text-[11px] font-semibold text-emerald-600/80">Village Education Program</span>

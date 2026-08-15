@@ -21,7 +21,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (basename($_SERVER['PHP_SELF']) === 'subjects.php') {
                 addSubject($name);
             } else {
-                addClass($name);
+                $ageMin = isset($_POST['age_min']) && $_POST['age_min'] !== '' ? (int) $_POST['age_min'] : null;
+                $ageMax = isset($_POST['age_max']) && $_POST['age_max'] !== '' ? (int) $_POST['age_max'] : null;
+                if ($ageMin !== null && $ageMax !== null && $ageMin > $ageMax) {
+                    throw new RuntimeException('"Age from" cannot be greater than "Age to".');
+                }
+                addClass($name, $ageMin, $ageMax);
             }
             $success = 'Added.';
             logActivity((basename($_SERVER['PHP_SELF']) === 'subjects.php' ? 'Subject' : 'Class') . ' added: ' . $name, 'admin:academics');
@@ -71,16 +76,23 @@ require_once __DIR__ . '/../includes/header.php';
 
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Add <?= strtolower($entity) ?></h2>
-                <form class="mt-4 flex gap-3" method="post">
+                <form class="mt-4 flex flex-wrap items-center gap-3" method="post">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="add">
                     <input type="text" name="name" placeholder="<?= $entity ?> name" class="flex-1 rounded-xl border border-emerald-200 px-3 py-2" required>
+                    <?php if (!$isSubjects): ?>
+                        <input type="number" name="age_min" placeholder="Age from (optional)" min="1" max="25" class="w-36 rounded-xl border border-emerald-200 px-3 py-2">
+                        <input type="number" name="age_max" placeholder="Age to (optional)" min="1" max="25" class="w-36 rounded-xl border border-emerald-200 px-3 py-2">
+                    <?php endif; ?>
                     <button class="rounded-full bg-emerald-700 px-6 py-2.5 font-semibold text-white">Add</button>
                 </form>
                 <div class="mt-5 flex flex-wrap gap-2">
                     <?php foreach ($rows as $row): ?>
                         <div class="inline-flex items-center gap-3 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm">
                             <span class="font-semibold text-slate-800"><?= htmlspecialchars($row['name']) ?></span>
+                            <?php if (!$isSubjects && (!empty($row['age_min']) || !empty($row['age_max']))): ?>
+                                <span class="text-xs font-medium text-emerald-700">(<?= (int) $row['age_min'] ?: '?' ?>–<?= (int) $row['age_max'] ?: '?' ?> yrs)</span>
+                            <?php endif; ?>
                             <form method="post" onsubmit="return confirm('Delete <?= htmlspecialchars($row['name']) ?>?');">
                                 <?= csrfField() ?>
                                 <input type="hidden" name="action" value="delete">

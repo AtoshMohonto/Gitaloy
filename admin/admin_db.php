@@ -41,11 +41,11 @@ function addCenter(string $name, ?int $villageId, ?string $description): int
     return (int) $pdo->lastInsertId();
 }
 
-function addClass(string $name): int
+function addClass(string $name, ?int $ageMin = null, ?int $ageMax = null): int
 {
     $pdo = getDbConnection();
-    $stmt = $pdo->prepare('INSERT INTO classes (name) VALUES (?)');
-    $stmt->execute([$name]);
+    $stmt = $pdo->prepare('INSERT INTO classes (name, age_min, age_max) VALUES (?, ?, ?)');
+    $stmt->execute([$name, $ageMin, $ageMax]);
     return (int) $pdo->lastInsertId();
 }
 

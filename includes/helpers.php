@@ -348,3 +348,33 @@ function requirePermission(string $key): void
         exit;
     }
 }
+
+/**
+ * Saves an uploaded JPG photo and returns its relative path (e.g. "uploads/photos/abc.jpg").
+ * Throws a RuntimeException with a friendly message when the file is not a valid JPG.
+ */
+function handlePhotoUpload(array $file): string
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Please choose a JPG photo to upload.');
+    }
+    if ((int) ($file['size'] ?? 0) > 5 * 1024 * 1024) {
+        throw new RuntimeException('Photo must be 5 MB or smaller.');
+    }
+    $info = @getimagesize($file['tmp_name']);
+    if ($info === false || ($info['mime'] ?? '') !== 'image/jpeg') {
+        throw new RuntimeException('Photo must be a JPG image.');
+    }
+    $dir = __DIR__ . '/../uploads/photos/';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0777, true);
+    }
+    if (!is_dir($dir)) {
+        throw new RuntimeException('The uploads directory is not writable.');
+    }
+    $fileName = 'photo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.jpg';
+    if (!move_uploaded_file($file['tmp_name'], $dir . $fileName)) {
+        throw new RuntimeException('The photo could not be saved.');
+    }
+    return 'uploads/photos/' . $fileName;
+}

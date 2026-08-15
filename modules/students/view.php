@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/helpers.php';
 require_once __DIR__ . '/student_db.php';
+require_once __DIR__ . '/../updates/updates_db.php';
 
 requireRole(ROLE_ADMIN, ROLE_DIV_MANAGER, ROLE_DIST_MANAGER, ROLE_ACCOUNTANT, ROLE_TEACHER, ROLE_STUDENT);
 
@@ -92,6 +93,7 @@ $historyStmt->execute([$studentId]);
 $attendanceHistory = $historyStmt->fetchAll();
 
 list($village, $upazila, $district, $division) = geoLabels($student);
+$classUpdates = getClassUpdatesForStudent((int) $student['center_id'], !empty($student['class_id']) ? (int) $student['class_id'] : null, 10);
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>
@@ -116,10 +118,14 @@ require_once __DIR__ . '/../../includes/header.php';
             <section class="relative overflow-hidden rounded-2xl bg-emerald-900 shadow-sm">
     <div class="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-emerald-600/30 blur-3xl"></div>
     <div class="pointer-events-none absolute -bottom-24 right-32 h-52 w-52 rounded-full bg-emerald-500/25 blur-3xl"></div>
-    <div class="relative z-10 flex flex-wrap items-center gap-6 px-6 py-8 sm:px-8">
-        <div class="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-white/15 ring-4 ring-white/10">
-            <i data-lucide="graduation-cap" class="h-9 w-9 text-emerald-100"></i>
-        </div>
+        <div class="relative z-10 flex flex-wrap items-center gap-6 px-6 py-8 sm:px-8">
+            <?php if (!empty($student['photo'])): ?>
+                <img src="<?= appBaseUrl() ?>/<?= htmlspecialchars($student['photo']) ?>" alt="<?= htmlspecialchars($student['name']) ?>" class="h-20 w-20 shrink-0 rounded-full object-cover ring-4 ring-white/10">
+            <?php else: ?>
+                <div class="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-white/15 ring-4 ring-white/10">
+                    <i data-lucide="graduation-cap" class="h-9 w-9 text-emerald-100"></i>
+                </div>
+            <?php endif; ?>
         <div class="min-w-0 flex-1">
             <p class="text-xs font-bold uppercase tracking-widest text-emerald-300"><?= htmlspecialchars($student['student_id']) ?></p>
             <h1 class="mt-1 truncate text-2xl font-extrabold text-white sm:text-3xl"><?= htmlspecialchars($student['name']) ?></h1>
@@ -216,6 +222,31 @@ require_once __DIR__ . '/../../includes/header.php';
                     <?php endif; ?>
                 </section>
             </div>
+
+            <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+                <h2 class="text-xl font-semibold text-slate-900">Class updates</h2>
+                <?php if (empty($classUpdates)): ?>
+                    <p class="mt-4 text-sm text-slate-500">No class updates yet.</p>
+                <?php else: ?>
+                    <div class="mt-4 space-y-3">
+                        <?php foreach ($classUpdates as $update): ?>
+                            <div class="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="rounded-full bg-emerald-900 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white"><?= htmlspecialchars($update['update_type']) ?><?= $update['update_type'] === 'Custom' && !empty($update['custom_label']) ? ': ' . htmlspecialchars($update['custom_label']) : '' ?></span>
+                                    <span class="text-xs text-slate-400"><?= htmlspecialchars(date('M j, Y', strtotime($update['created_at']))) ?> · <?= htmlspecialchars($update['teacher_name'] ?: 'Teacher') ?><?= $update['class_name'] ? ' · ' . htmlspecialchars($update['class_name']) : '' ?></span>
+                                </div>
+                                <h3 class="mt-2 text-sm font-bold text-slate-900"><?= htmlspecialchars($update['title']) ?></h3>
+                                <?php if (!empty($update['body'])): ?>
+                                    <p class="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-600"><?= htmlspecialchars($update['body']) ?></p>
+                                <?php endif; ?>
+                                <?php if (!empty($update['photo'])): ?>
+                                    <img src="<?= appBaseUrl() ?>/<?= htmlspecialchars($update['photo']) ?>" alt="" class="mt-3 h-40 w-full rounded-xl border border-emerald-100 object-cover">
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </section>
 
             <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h2 class="text-xl font-semibold text-slate-900">Attendance history</h2>

@@ -52,8 +52,13 @@ CREATE TABLE IF NOT EXISTS centers (
 
 CREATE TABLE IF NOT EXISTS classes (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL
+  name VARCHAR(100) NOT NULL,
+  age_min INT DEFAULT NULL,
+  age_max INT DEFAULT NULL
 ) ENGINE=InnoDB;
+
+ALTER TABLE classes ADD COLUMN age_min INT DEFAULT NULL;
+ALTER TABLE classes ADD COLUMN age_max INT DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS subjects (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -76,8 +81,11 @@ CREATE TABLE IF NOT EXISTS users (
   scope_id INT DEFAULT NULL,
   center_id INT DEFAULT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  photo VARCHAR(255) DEFAULT NULL
 ) ENGINE=InnoDB;
+
+ALTER TABLE users ADD COLUMN photo VARCHAR(255) DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS students (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -94,11 +102,14 @@ CREATE TABLE IF NOT EXISTS students (
   admission_date DATE DEFAULT NULL,
   status ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  photo VARCHAR(255) DEFAULT NULL,
   CONSTRAINT fk_students_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_students_village FOREIGN KEY (village_id) REFERENCES villages(id) ON DELETE SET NULL,
   CONSTRAINT fk_students_center FOREIGN KEY (center_id) REFERENCES centers(id),
   CONSTRAINT fk_students_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
+
+ALTER TABLE students ADD COLUMN photo VARCHAR(255) DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS student_documents (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -106,6 +117,26 @@ CREATE TABLE IF NOT EXISTS student_documents (
   file_path VARCHAR(255) NOT NULL,
   uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_sdocuments_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------------
+-- Class updates (teacher newsfeed with Daily/Weekly/Custom schedule)
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS class_updates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  teacher_id INT NOT NULL,
+  center_id INT DEFAULT NULL,
+  class_id INT DEFAULT NULL,
+  title VARCHAR(200) NOT NULL,
+  body TEXT DEFAULT NULL,
+  photo VARCHAR(255) DEFAULT NULL,
+  update_type ENUM('Daily','Weekly','Custom') NOT NULL DEFAULT 'Daily',
+  custom_label VARCHAR(100) DEFAULT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_cupdates_teacher FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_cupdates_center FOREIGN KEY (center_id) REFERENCES centers(id) ON DELETE SET NULL,
+  CONSTRAINT fk_cupdates_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------------
@@ -347,19 +378,21 @@ INSERT INTO permissions (id, pkey, label, pgroup, sort) VALUES
   (21, 'admin.geography', 'Geography setup', 'Admin Setup', 10),
   (22, 'admin.centers', 'Centers setup', 'Admin Setup', 20),
   (23, 'admin.classes', 'Classes, subjects & years', 'Admin Setup', 30),
-  (24, 'admin.fees', 'Fee heads & items', 'Admin Setup', 40)
+  (24, 'admin.fees', 'Fee heads & items', 'Admin Setup', 40),
+  (25, 'updates.view', 'View class updates', 'Class Updates', 10),
+  (26, 'updates.manage', 'Post class updates', 'Class Updates', 20)
 ON DUPLICATE KEY UPDATE label = VALUES(label), pgroup = VALUES(pgroup), sort = VALUES(sort);
 
 INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES
   (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
   (1, 11), (1, 12), (1, 13), (1, 14), (1, 15), (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
-  (1, 21), (1, 22), (1, 23), (1, 24),
+  (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26),
   (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9), (2, 10),
-  (2, 11), (2, 12), (2, 13), (2, 14), (2, 15), (2, 16), (2, 17),
+  (2, 11), (2, 12), (2, 13), (2, 14), (2, 15), (2, 16), (2, 17), (2, 25), (2, 26),
   (3, 1), (3, 2), (3, 3), (3, 4), (3, 5), (3, 6), (3, 7), (3, 8), (3, 9), (3, 10),
-  (3, 11), (3, 12), (3, 13), (3, 14), (3, 15), (3, 16), (3, 17),
+  (3, 11), (3, 12), (3, 13), (3, 14), (3, 15), (3, 16), (3, 17), (3, 25), (3, 26),
   (4, 1), (4, 2), (4, 3), (4, 4), (4, 5), (4, 6), (4, 7), (4, 8), (4, 9), (4, 10),
-  (4, 11), (4, 12), (4, 13), (4, 16), (4, 17),
+  (4, 11), (4, 12), (4, 13), (4, 16), (4, 17), (4, 25),
   (5, 1), (5, 2), (5, 3), (5, 4), (5, 5), (5, 6), (5, 7), (5, 8), (5, 9), (5, 10),
-  (5, 11), (5, 12), (5, 13), (5, 16),
-  (6, 1);
+  (5, 11), (5, 12), (5, 13), (5, 16), (5, 25), (5, 26),
+  (6, 1), (6, 25);

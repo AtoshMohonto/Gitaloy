@@ -1,11 +1,20 @@
 <?php
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../users/user_db.php';
-
 if (!empty($_SESSION['user_id'])) {
     header('Location: ' . appBaseUrl() . '/modules/dashboard/index.php');
     exit;
 }
+
+$pdo = getDbConnection();
+$selfRoles = $pdo->query('SELECT id, name FROM roles WHERE id IN (2, 3, 4, 5, 6) AND is_system = 1 ORDER BY id')->fetchAll();
+$roleDescriptions = [
+    ROLE_DIV_MANAGER => 'Oversees all centers in a division',
+    ROLE_DIST_MANAGER => 'Oversees all centers in a district',
+    ROLE_ACCOUNTANT => 'Handles fees, expenses, and reports',
+    ROLE_TEACHER => 'Manages their own study center and students',
+    ROLE_STUDENT => 'Follows their own progress and report card',
+];
 
 $error = null;
 $success = null;
@@ -15,6 +24,7 @@ $formData = [
     'username' => '',
     'email' => '',
     'phone' => '',
+    'role_id' => ROLE_STUDENT,
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -22,6 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formData['username'] = trim($_POST['username'] ?? '');
     $formData['email'] = trim($_POST['email'] ?? '');
     $formData['phone'] = trim($_POST['phone'] ?? '');
+    $formData['role_id'] = (int) ($_POST['role_id'] ?? ROLE_STUDENT);
+    if (!in_array($formData['role_id'], [ROLE_DIV_MANAGER, ROLE_DIST_MANAGER, ROLE_ACCOUNTANT, ROLE_TEACHER, ROLE_STUDENT], true)) {
+        $formData['role_id'] = ROLE_STUDENT;
+    }
     $password = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
 
@@ -43,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'username' => $formData['username'],
             'email' => $formData['email'],
             'password' => $password,
-            'role_id' => ROLE_STUDENT,
+            'role_id' => $formData['role_id'],
             'phone' => $formData['phone'],
             'scope_type' => '',
             'scope_id' => null,
@@ -55,10 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'auth',
             $newUserId,
             $formData['name'],
-            ROLE_STUDENT
+            $formData['role_id']
         );
         $success = 'Account created! An administrator needs to approve your account before you can sign in.';
-        $formData = ['name' => '', 'username' => '', 'email' => '', 'phone' => ''];
+        $formData = ['name' => '', 'username' => '', 'email' => '', 'phone' => '', 'role_id' => ROLE_STUDENT];
     }
 }
 
@@ -69,8 +83,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="text-center">
             <span class="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-2xl text-white">🌾</span>
             <h1 class="mt-4 text-2xl font-semibold text-slate-900">Create an account</h1>
-            <p class="mt-2 text-sm text-slate-600">Sign up for Gitaloy. An admin will review and approve your account.</p>
-        </div>
+            <p class="mt-2 text-sm text-slate-600">Sign up for Gitaloy. An admin will review and approve your account.</p>        </div>
 
         <?php if ($success !== null): ?>
             <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"><?= htmlspecialchars($success) ?></div>
@@ -99,6 +112,14 @@ require_once __DIR__ . '/../../includes/header.php';
                 <div>
                     <label class="mb-1 block text-sm font-medium text-slate-700">Phone (optional)</label>
                     <input type="text" name="phone" value="<?= htmlspecialchars($formData['phone']) ?>" class="w-full rounded-xl border border-emerald-200 px-3 py-2">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700">What best describes you?</label>
+                    <select name="role_id" class="w-full rounded-xl border border-emerald-200 px-3 py-2">
+                        <?php foreach ($selfRoles as $role): ?>
+                            <option value="<?= (int) $role['id'] ?>" <?= (int) $formData['role_id'] === (int) $role['id'] ? 'selected' : '' ?>><?= htmlspecialchars($role['name']) ?><?= isset($roleDescriptions[(int) $role['id']]) ? ' — ' . $roleDescriptions[(int) $role['id']] : '' ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-slate-700">Password</label>

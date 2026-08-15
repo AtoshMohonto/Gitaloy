@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/helpers.php';
 require_once __DIR__ . '/../students/student_db.php';
+require_once __DIR__ . '/../updates/updates_db.php';
 
 requireAuth();
 
@@ -25,6 +26,7 @@ if (isStudent()) {
         'center' => $student['center_name'] ?? '—',
         'class' => $student['class_name'] ?? '—',
     ];
+    $updates = $student ? getClassUpdatesForStudent((int) $student['center_id'], !empty($student['class_id']) ? (int) $student['class_id'] : null, 5) : [];
 } else {
     $scope = getStudentScopeFilter('s');
     $stats['students'] = (int) $pdo->query(
@@ -48,6 +50,7 @@ if (isStudent()) {
         . getCenterScopeJoins('c') . ' WHERE ' . getCenterScopeFilter('c') . ' ORDER BY ss.session_date DESC LIMIT 5'
     )->fetchAll();
     $stats['recent'] = $recent;
+    $updates = getClassUpdates(5);
 }
 
 require_once __DIR__ . '/../../includes/header.php';
@@ -179,6 +182,32 @@ require_once __DIR__ . '/../../includes/header.php';
                     </section>
                 <?php endif; ?>
             <?php endif; ?>
+
+            <section class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-xl font-semibold text-slate-900">Latest class updates</h2>
+                    <?php if (isStaff()): ?>
+                        <a href="<?= appBaseUrl() ?>/modules/updates/index.php" class="text-sm font-semibold text-emerald-700 hover:underline">View all →</a>
+                    <?php endif; ?>
+                </div>
+                <div class="mt-4 space-y-3">
+                    <?php if (empty($updates)): ?>
+                        <p class="text-sm text-slate-500">No class updates yet.</p>
+                    <?php endif; ?>
+                    <?php foreach ($updates as $update): ?>
+                        <div class="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="rounded-full bg-emerald-900 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white"><?= htmlspecialchars($update['update_type']) ?><?= $update['update_type'] === 'Custom' && !empty($update['custom_label']) ? ': ' . htmlspecialchars($update['custom_label']) : '' ?></span>
+                                <span class="text-xs text-slate-400"><?= htmlspecialchars(date('M j', strtotime($update['created_at']))) ?> · <?= htmlspecialchars($update['teacher_name'] ?: 'Staff') ?></span>
+                            </div>
+                            <h3 class="mt-2 text-sm font-bold text-slate-900"><?= htmlspecialchars($update['title']) ?></h3>
+                            <?php if (!empty($update['body'])): ?>
+                                <p class="mt-1 line-clamp-2 whitespace-pre-line text-sm leading-relaxed text-slate-600"><?= htmlspecialchars($update['body']) ?></p>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </section>
         </div>
     </main>
 </div>

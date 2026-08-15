@@ -8,6 +8,7 @@ requirePermission('students.view');
 $pdo = getDbConnection();
 $success = null;
 $error = null;
+$importErrors = [];
 
 // Scoped center list for forms
 $centerFilter = getCenterScopeFilter();
@@ -18,6 +19,33 @@ $scopedCenters = $stmt->fetchAll();
 
 $isTeacher = isTeacher();
 $teacherCenterId = $isTeacher ? (int) (currentUser()['center_id'] ?? 0) : null;
+$canManage = hasPermission('students.manage');
+
+// Upazila of the teacher's current center, used to pre-fill the inline village form.
+$defaultUpazilaId = 0;
+if ($isTeacher && $teacherCenterId > 0) {
+    $stmt = $pdo->prepare('SELECT v.upazila_id FROM centers c LEFT JOIN villages v ON v.id = c.village_id WHERE c.id = ?');
+    $stmt->execute([$teacherCenterId]);
+    $defaultUpazilaId = (int) ($stmt->fetchColumn() ?: 0);
+}
+
+// CSV template download
+if (isset($_GET['download_template']) && $canManage) {
+    $templateColumns = ['Name', 'Guardian Name', 'Guardian Phone', 'Date of Birth (YYYY-MM-DD)', 'Gender (Male/Female)', 'Village', 'Class', 'Admission Date (YYYY-MM-DD)', 'Status'];
+    $templateSample = ['Sample Student', 'Guardian Name', '01700000000', '2010-05-15', 'Male', 'Village Name', 'Class 1', '2026-01-01', 'Active'];
+    if (!$isTeacher) {
+        array_splice($templateColumns, 6, 0, ['Center']);
+        array_splice($templateSample, 6, 0, ['Center Name']);
+    }
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="students_import_template.csv"');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF");
+    fputcsv($out, $templateColumns);
+    fputcsv($out, $templateSample);
+    fclose($out);
+    exit;
+}
 
 $formData = [
     'id' => 0,
@@ -60,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Invalid request. Please refresh and try again.';
     } else {
     if ($action === 'create' || $action === 'update') {
+        $formData['id'] = (int) ($_POST['id'] ?? 0);
         $formData['name'] = trim($_POST['name'] ?? '');
         $formData['guardian_name'] = trim($_POST['guardian_name'] ?? '');
         $formData['guardian_phone'] = trim($_POST['guardian_phone'] ?? '');
@@ -98,6 +127,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'admission_date' => $formData['admission_date'] !== '' ? $formData['admission_date'] : null,
                 'status' => $formData['status'],
             ];
+
+            if (isset($_POST['remove_photo']) && $action === 'update') {
+                $data['photo'] = null;
+            } elseif (!empty($_FILES['photo']['name'])) {
+                try {
+                    $data['photo'] = handlePhotoUpload($_FILES['photo']);
+                } catch (RuntimeException $e) {
+                    $errors[] = $e->getMessage();
+                }
+            }
 
             try {
                 if ($action === 'update') {
@@ -162,6 +201,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             logActivity('Reset password for student: ' . $student['student_id'], 'students');
         }
     }
+
+    if ($action === 'import_csv') {
+        if (!$canManage) {
+            $error = 'You do not have permission to import students.';
+        } else {
+            try {
+                $rows = readCsvRows($_FILES['csv_file'] ?? []);
+                $report = importStudentsFromCsv($rows, [
+                    'is_teacher' => $isTeacher,
+                    'teacher_center_id' => $teacherCenterId ?: 0,
+                ]);
+                if ($report['added'] > 0) {
+                    $success = 'Imported ' . $report['added'] . ' student' . ($report['added'] === 1 ? '' : 's') . ' successfully.'
+                        . (count($report['errors']) > 0 ? ' ' . count($report['errors']) . ' row' . (count($report['errors']) === 1 ? '' : 's') . ' skipped.' : '');
+                    logActivity('CSV import added ' . $report['added'] . ' students', 'students');
+                } elseif (empty($report['errors'])) {
+                    $error = 'No students found to import.';
+                }
+                $importErrors = $report['errors'];
+            } catch (Throwable $e) {
+                $error = 'Could not import CSV: ' . $e->getMessage();
+            }
+        }
+    }
     }
 }
 
@@ -212,7 +275,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php if (isset($_GET['add']) || $editStudent): ?>
                 <section id="student-form" class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
                     <h2 class="text-xl font-semibold text-slate-900"><?= $editStudent ? 'Edit student' : 'Add new student' ?></h2>
-                    <form class="mt-5 grid gap-4 lg:grid-cols-3" method="post" action="<?= appBaseUrl() ?>/modules/students/index.php" novalidate>
+                    <form class="mt-5 grid gap-4 lg:grid-cols-3" method="post" action="<?= appBaseUrl() ?>/modules/students/index.php" enctype="multipart/form-data" novalidate>
                         <?= csrfField() ?>
                         <input type="hidden" name="action" value="<?= $editStudent ? 'update' : 'create' ?>">
                         <?php if ($editStudent): ?>
@@ -245,30 +308,45 @@ require_once __DIR__ . '/../../includes/header.php';
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium">Village</label>
-                            <select name="village_id" id="form-village" class="w-full rounded-xl border border-emerald-200 px-3 py-2">
-                                <option value="">Select village</option>
-                                <?php foreach (getVillages() as $village): ?>
-                                    <option value="<?= (int) $village['id'] ?>" <?= (string) $village['id'] === $formData['village_id'] ? 'selected' : '' ?>><?= htmlspecialchars($village['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <div class="flex gap-2">
+                                <select name="village_id" id="form-village" class="flex-1 rounded-xl border border-emerald-200 px-3 py-2">
+                                    <option value="">Select village</option>
+                                    <?php foreach (getVillages() as $village): ?>
+                                        <option value="<?= (int) $village['id'] ?>" <?= (string) $village['id'] === $formData['village_id'] ? 'selected' : '' ?>><?= htmlspecialchars($village['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php if ($canManage): ?>
+                                    <button type="button" id="btn-add-village" class="shrink-0 rounded-xl border border-emerald-300 bg-emerald-50 px-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100" title="Add a new village">+ New</button>
+                                <?php endif; ?>
+                            </div>
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium">Study center</label>
-                            <select name="center_id" class="w-full rounded-xl border border-emerald-200 px-3 py-2" required>
-                                <option value="">Select center</option>
-                                <?php foreach ($scopedCenters as $center): ?>
-                                    <option value="<?= (int) $center['id'] ?>" <?= (string) $center['id'] === $formData['center_id'] ? 'selected' : '' ?>><?= htmlspecialchars($center['name']) ?><?= !empty($center['village_name']) ? ' — ' . htmlspecialchars($center['village_name']) : '' ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <div class="flex gap-2">
+                                <select name="center_id" id="form-center" class="flex-1 rounded-xl border border-emerald-200 px-3 py-2" <?= $isTeacher ? 'data-teacher="1"' : '' ?> required>
+                                    <option value="">Select center</option>
+                                    <?php foreach ($scopedCenters as $center): ?>
+                                        <option value="<?= (int) $center['id'] ?>" <?= (string) $center['id'] === $formData['center_id'] ? 'selected' : '' ?>><?= htmlspecialchars($center['name']) ?><?= !empty($center['village_name']) ? ' — ' . htmlspecialchars($center['village_name']) : '' ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php if ($canManage): ?>
+                                    <button type="button" id="btn-add-center" class="shrink-0 rounded-xl border border-emerald-300 bg-emerald-50 px-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100" title="Add a new center">+ New</button>
+                                <?php endif; ?>
+                            </div>
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium">Class</label>
-                            <select name="class_id" class="w-full rounded-xl border border-emerald-200 px-3 py-2">
-                                <option value="">Select class</option>
-                                <?php foreach ($classes as $class): ?>
-                                    <option value="<?= (int) $class['id'] ?>" <?= (string) $class['id'] === $formData['class_id'] ? 'selected' : '' ?>><?= htmlspecialchars($class['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <div class="flex gap-2">
+                                <select name="class_id" id="form-class" class="flex-1 rounded-xl border border-emerald-200 px-3 py-2">
+                                    <option value="">Select class</option>
+                                    <?php foreach ($classes as $class): ?>
+                                        <option value="<?= (int) $class['id'] ?>" <?= (string) $class['id'] === $formData['class_id'] ? 'selected' : '' ?>><?= htmlspecialchars($class['name']) ?><?= (!empty($class['age_min']) || !empty($class['age_max'])) ? ' (' . ((int) $class['age_min'] ?: '?') . '–' . ((int) $class['age_max'] ?: '?') . ' yrs)' : '' ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php if ($canManage): ?>
+                                    <button type="button" id="btn-add-class" class="shrink-0 rounded-xl border border-emerald-300 bg-emerald-50 px-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100" title="Add a new class">+ New</button>
+                                <?php endif; ?>
+                            </div>
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium">Admission date</label>
@@ -281,6 +359,21 @@ require_once __DIR__ . '/../../includes/header.php';
                                 <option value="Inactive" <?= $formData['status'] === 'Inactive' ? 'selected' : '' ?>>Inactive</option>
                             </select>
                         </div>
+                        <div class="lg:col-span-3">
+                            <label class="mb-1 block text-sm font-medium">Photo (JPG only)</label>
+                            <div class="flex flex-wrap items-center gap-4">
+                                <?php if (!empty($editStudent['photo'])): ?>
+                                    <img src="<?= appBaseUrl() ?>/<?= htmlspecialchars($editStudent['photo']) ?>" alt="Student photo" class="h-16 w-16 rounded-xl border border-emerald-100 object-cover">
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                        <input type="checkbox" name="remove_photo" value="1" class="rounded border-emerald-300 text-emerald-700 focus:ring-emerald-200">
+                                        Remove current photo
+                                    </label>
+                                <?php else: ?>
+                                    <p class="text-xs text-slate-400">No photo yet — upload a JPG picture of the student.</p>
+                                <?php endif; ?>
+                                <input type="file" name="photo" accept="image/jpeg,.jpg,.jpeg" class="rounded-xl border border-emerald-200 px-3 py-2 text-sm">
+                            </div>
+                        </div>
                         <div class="lg:col-span-3 flex items-center gap-3">
                             <button class="rounded-full bg-emerald-700 px-6 py-3 font-semibold text-white"><?= $editStudent ? 'Save changes' : 'Add student' ?></button>
                             <?php if ($editStudent): ?>
@@ -288,6 +381,45 @@ require_once __DIR__ . '/../../includes/header.php';
                             <?php endif; ?>
                         </div>
                     </form>
+                </section>
+            <?php endif; ?>
+
+            <?php if ($canManage): ?>
+                <section id="csv-import" class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-xl font-semibold text-slate-900">Import students (CSV)</h2>
+                            <p class="mt-1 text-sm text-slate-600">
+                                Upload a CSV file to add many students at once (max 500 rows).
+                                <?= $isTeacher ? 'Students are added to your own center.' : 'Each row needs the center name exactly as it appears in the system.' ?>
+                            </p>
+                        </div>
+                        <a href="<?= appBaseUrl() ?>/modules/students/index.php?download_template=1" class="inline-flex items-center gap-2 rounded-full border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                            <i data-lucide="download" class="h-4 w-4"></i>Download CSV template
+                        </a>
+                    </div>
+                    <form class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end" method="post" action="<?= appBaseUrl() ?>/modules/students/index.php" enctype="multipart/form-data">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="import_csv">
+                        <div class="flex-1">
+                            <label class="mb-1 block text-sm font-medium">CSV file</label>
+                            <input type="file" name="csv_file" accept=".csv,text/csv" class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm" required>
+                        </div>
+                        <button class="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white">Import students</button>
+                    </form>
+                    <?php if (!empty($importErrors)): ?>
+                        <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                            <p class="text-sm font-semibold text-amber-800"><?= count($importErrors) ?> row<?= count($importErrors) === 1 ? '' : 's' ?> could not be imported:</p>
+                            <ul class="mt-2 max-h-48 list-inside list-disc space-y-1 overflow-y-auto text-sm text-amber-800">
+                                <?php foreach (array_slice($importErrors, 0, 50) as $err): ?>
+                                    <li><?= htmlspecialchars($err) ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <?php if (count($importErrors) > 50): ?>
+                                <p class="mt-2 text-xs text-amber-600">…and <?= count($importErrors) - 50 ?> more.</p>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
                 </section>
             <?php endif; ?>
 
@@ -372,8 +504,17 @@ require_once __DIR__ . '/../../includes/header.php';
                                 <tr class="bg-white">
                                     <td class="px-3 py-4 font-semibold text-slate-800"><?= htmlspecialchars($student['student_id']) ?></td>
                                     <td class="px-3 py-4">
-                                        <p class="font-semibold text-slate-800"><?= htmlspecialchars($student['name']) ?></p>
-                                        <p class="text-xs text-slate-500"><?= htmlspecialchars($student['gender'] ?: '—') ?></p>
+                                        <div class="flex items-center gap-3">
+                                            <?php if (!empty($student['photo'])): ?>
+                                                <img src="<?= appBaseUrl() ?>/<?= htmlspecialchars($student['photo']) ?>" alt="" class="h-9 w-9 shrink-0 rounded-full border border-emerald-100 object-cover">
+                                            <?php else: ?>
+                                                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700"><?= htmlspecialchars(strtoupper(substr($student['name'], 0, 1))) ?></span>
+                                            <?php endif; ?>
+                                            <div>
+                                                <p class="font-semibold text-slate-800"><?= htmlspecialchars($student['name']) ?></p>
+                                                <p class="text-xs text-slate-500"><?= htmlspecialchars($student['gender'] ?: '—') ?></p>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="px-3 py-4 text-slate-600">
                                         <p><?= htmlspecialchars($student['guardian_name'] ?: '—') ?></p>
@@ -428,6 +569,110 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </main>
 </div>
+
+<?php if ($canManage): ?>
+    <div id="modal-village" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-emerald-950/60 backdrop-blur-sm" data-close="modal-village"></div>
+        <div class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Add new village</h3>
+                    <p class="mt-1 text-sm text-slate-500">It will appear in the village dropdown immediately.</p>
+                </div>
+                <button type="button" data-close="modal-village" class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><i data-lucide="x" class="h-4 w-4"></i></button>
+            </div>
+            <form id="form-add-village" class="mt-5 space-y-4" data-default-upazila="<?= (int) $defaultUpazilaId ?>">
+                <?= csrfField() ?>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Village name</label>
+                    <input type="text" name="name" id="village-name" class="w-full rounded-xl border border-emerald-200 px-3 py-2" placeholder="e.g. Gitaloy" required>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Upazila</label>
+                    <select name="upazila_id" id="village-upazila" class="w-full rounded-xl border border-emerald-200 px-3 py-2" required>
+                        <option value="">Select upazila</option>
+                    </select>
+                </div>
+                <p id="village-modal-msg" class="hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"></p>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="rounded-full bg-emerald-700 px-6 py-2.5 font-semibold text-white">Add village</button>
+                    <button type="button" data-close="modal-village" class="rounded-full border border-emerald-200 px-5 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-center" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-emerald-950/60 backdrop-blur-sm" data-close="modal-center"></div>
+        <div class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Add new center</h3>
+                    <p class="mt-1 text-sm text-slate-500"><?= $isTeacher ? 'It becomes your new assigned center.' : 'It will appear in the center dropdown immediately.' ?></p>
+                </div>
+                <button type="button" data-close="modal-center" class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><i data-lucide="x" class="h-4 w-4"></i></button>
+            </div>
+            <form id="form-add-center" class="mt-5 space-y-4">
+                <?= csrfField() ?>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Center name</label>
+                    <input type="text" name="name" id="center-name" class="w-full rounded-xl border border-emerald-200 px-3 py-2" placeholder="e.g. Gitaloy Mondir" required>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Village</label>
+                    <select name="village_id" id="center-village" class="w-full rounded-xl border border-emerald-200 px-3 py-2">
+                        <option value="">Select village</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Description</label>
+                    <input type="text" name="description" id="center-description" class="w-full rounded-xl border border-emerald-200 px-3 py-2" placeholder="Short description (optional)">
+                </div>
+                <p id="center-modal-msg" class="hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"></p>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="rounded-full bg-emerald-700 px-6 py-2.5 font-semibold text-white">Add center</button>
+                    <button type="button" data-close="modal-center" class="rounded-full border border-emerald-200 px-5 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-class" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-emerald-950/60 backdrop-blur-sm" data-close="modal-class"></div>
+        <div class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Add new class</h3>
+                    <p class="mt-1 text-sm text-slate-500">Optionally set the age range for this class.</p>
+                </div>
+                <button type="button" data-close="modal-class" class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"><i data-lucide="x" class="h-4 w-4"></i></button>
+            </div>
+            <form id="form-add-class" class="mt-5 space-y-4">
+                <?= csrfField() ?>
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Class name</label>
+                    <input type="text" name="name" id="class-name" class="w-full rounded-xl border border-emerald-200 px-3 py-2" placeholder="e.g. Class 6" required>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Age from (optional)</label>
+                        <input type="number" name="age_min" id="class-age-min" min="1" max="25" class="w-full rounded-xl border border-emerald-200 px-3 py-2" placeholder="e.g. 7">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Age to (optional)</label>
+                        <input type="number" name="age_max" id="class-age-max" min="1" max="25" class="w-full rounded-xl border border-emerald-200 px-3 py-2" placeholder="e.g. 8">
+                    </div>
+                </div>
+                <p id="class-modal-msg" class="hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"></p>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="rounded-full bg-emerald-700 px-6 py-2.5 font-semibold text-white">Add class</button>
+                    <button type="button" data-close="modal-class" class="rounded-full border border-emerald-200 px-5 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+<?php endif; ?>
+
 <input type="hidden" id="api-base" value="<?= appBaseUrl() ?>">
 <script src="<?= appBaseUrl() ?>/assets/js/students.js"></script>
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>
