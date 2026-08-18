@@ -303,6 +303,26 @@ CREATE TABLE IF NOT EXISTS settings (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------------
+-- Content blocks: generic repeatable items for the landing page
+-- (stats/counters, programs/causes, gallery photos, updates, testimonials).
+-- Lets the admin add as many items per section as needed without a code change.
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS content_blocks (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  section VARCHAR(30) NOT NULL,
+  title VARCHAR(200) DEFAULT NULL,
+  subtitle VARCHAR(200) DEFAULT NULL,
+  body TEXT DEFAULT NULL,
+  icon VARCHAR(50) DEFAULT NULL,
+  image VARCHAR(255) DEFAULT NULL,
+  stat_value VARCHAR(50) DEFAULT NULL,
+  link_url VARCHAR(255) DEFAULT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------------
 -- Activity log (site-wide audit trail shown in the admin panel)
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS activity_log (

@@ -350,6 +350,129 @@ function requirePermission(string $key): void
 }
 
 /**
+ * Content blocks power the repeatable sections on the public landing page
+ * (stats/counters, programs/causes, gallery photos, updates, testimonials).
+ * Each section can hold any number of items, added/edited/removed from
+ * Admin -> Frontend Content -> Content Blocks without touching code.
+ */
+function getContentBlocks(string $section, bool $onlyActive = false): array
+{
+    $pdo = getDbConnection();
+    $sql = 'SELECT * FROM content_blocks WHERE section = ?';
+    if ($onlyActive) {
+        $sql .= ' AND is_active = 1';
+    }
+    $sql .= ' ORDER BY sort_order ASC, id ASC';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$section]);
+    return $stmt->fetchAll();
+}
+
+function getContentBlockById(int $id): ?array
+{
+    $pdo = getDbConnection();
+    $stmt = $pdo->prepare('SELECT * FROM content_blocks WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    return $row === false ? null : $row;
+}
+
+function nextContentBlockOrder(string $section): int
+{
+    $pdo = getDbConnection();
+    $stmt = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM content_blocks WHERE section = ?');
+    $stmt->execute([$section]);
+    return (int) $stmt->fetchColumn();
+}
+
+function createContentBlock(array $data): int
+{
+    $pdo = getDbConnection();
+    $stmt = $pdo->prepare(
+        'INSERT INTO content_blocks (section, title, subtitle, body, icon, image, stat_value, link_url, sort_order, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)'
+    );
+    $stmt->execute([
+        $data['section'],
+        ($data['title'] ?? '') !== '' ? $data['title'] : null,
+        ($data['subtitle'] ?? '') !== '' ? $data['subtitle'] : null,
+        ($data['body'] ?? '') !== '' ? $data['body'] : null,
+        ($data['icon'] ?? '') !== '' ? $data['icon'] : null,
+        $data['image'] ?? null,
+        ($data['stat_value'] ?? '') !== '' ? $data['stat_value'] : null,
+        ($data['link_url'] ?? '') !== '' ? $data['link_url'] : null,
+        (int) ($data['sort_order'] ?? nextContentBlockOrder($data['section'])),
+    ]);
+    return (int) $pdo->lastInsertId();
+}
+
+function updateContentBlock(int $id, array $data): bool
+{
+    $pdo = getDbConnection();
+    $stmt = $pdo->prepare(
+        'UPDATE content_blocks
+         SET title = ?, subtitle = ?, body = ?, icon = ?, image = COALESCE(?, image), stat_value = ?, link_url = ?
+         WHERE id = ?'
+    );
+    return $stmt->execute([
+        ($data['title'] ?? '') !== '' ? $data['title'] : null,
+        ($data['subtitle'] ?? '') !== '' ? $data['subtitle'] : null,
+        ($data['body'] ?? '') !== '' ? $data['body'] : null,
+        ($data['icon'] ?? '') !== '' ? $data['icon'] : null,
+        $data['image'] ?? null,
+        ($data['stat_value'] ?? '') !== '' ? $data['stat_value'] : null,
+        ($data['link_url'] ?? '') !== '' ? $data['link_url'] : null,
+        $id,
+    ]);
+}
+
+function deleteContentBlock(int $id): bool
+{
+    $pdo = getDbConnection();
+    return $pdo->prepare('DELETE FROM content_blocks WHERE id = ?')->execute([$id]);
+}
+
+function toggleContentBlock(int $id): bool
+{
+    $pdo = getDbConnection();
+    return $pdo->prepare('UPDATE content_blocks SET is_active = 1 - is_active WHERE id = ?')->execute([$id]);
+}
+
+/**
+ * Swaps sort_order with the previous/next item in the same section, so the
+ * admin can reorder cards with simple up/down controls.
+ */
+function moveContentBlock(int $id, string $direction): bool
+{
+    $block = getContentBlockById($id);
+    if ($block === null) {
+        return false;
+    }
+    $list = getContentBlocks($block['section']);
+    $index = null;
+    foreach ($list as $i => $row) {
+        if ((int) $row['id'] === $id) {
+            $index = $i;
+            break;
+        }
+    }
+    if ($index === null) {
+        return false;
+    }
+    $swapIndex = $direction === 'up' ? $index - 1 : $index + 1;
+    if ($swapIndex < 0 || $swapIndex >= count($list)) {
+        return false;
+    }
+    $a = $list[$index];
+    $b = $list[$swapIndex];
+    $pdo = getDbConnection();
+    $stmt = $pdo->prepare('UPDATE content_blocks SET sort_order = ? WHERE id = ?');
+    $stmt->execute([(int) $b['sort_order'], (int) $a['id']]);
+    $stmt->execute([(int) $a['sort_order'], (int) $b['id']]);
+    return true;
+}
+
+/**
  * Saves an uploaded JPG photo and returns its relative path (e.g. "uploads/photos/abc.jpg").
  * Throws a RuntimeException with a friendly message when the file is not a valid JPG.
  */
@@ -377,4 +500,37 @@ function handlePhotoUpload(array $file): string
         throw new RuntimeException('The photo could not be saved.');
     }
     return 'uploads/photos/' . $fileName;
+}
+
+/**
+ * Saves an uploaded JPG/PNG/WebP/GIF image for content blocks (gallery, updates,
+ * testimonials) and returns its relative path. Throws a RuntimeException with a
+ * friendly message on invalid input.
+ */
+function handleContentImageUpload(array $file, string $prefix = 'block'): string
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Please choose an image to upload.');
+    }
+    if ((int) ($file['size'] ?? 0) > 5 * 1024 * 1024) {
+        throw new RuntimeException('Image must be 5 MB or smaller.');
+    }
+    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+    $info = @getimagesize($file['tmp_name']);
+    $mime = $info['mime'] ?? '';
+    if ($info === false || !isset($allowed[$mime])) {
+        throw new RuntimeException('Image must be a JPG, PNG, WebP or GIF.');
+    }
+    $dir = __DIR__ . '/../uploads/';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0777, true);
+    }
+    if (!is_dir($dir)) {
+        throw new RuntimeException('The uploads directory is not writable.');
+    }
+    $fileName = $prefix . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $allowed[$mime];
+    if (!move_uploaded_file($file['tmp_name'], $dir . $fileName)) {
+        throw new RuntimeException('The image could not be saved.');
+    }
+    return 'uploads/' . $fileName;
 }

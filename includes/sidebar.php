@@ -123,8 +123,11 @@ $showOps = $isStaff || hasAnyPermission(['students.view', 'attendance.view', 'fe
                 <a href="<?= $base ?>/modules/settings/index.php" class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold <?= navActive(['/modules/settings/']) ? 'bg-emerald-600 text-white' : 'text-emerald-100 hover:bg-emerald-900 hover:text-white' ?>">
                     <i data-lucide="sliders-horizontal" class="h-4 w-4 <?= navActive(['/modules/settings/']) ? 'text-white' : 'text-emerald-400' ?>"></i><span class="sidebar-label">Site Settings</span>
                 </a>
-                <a href="<?= $base ?>/modules/content/index.php" class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold <?= navActive(['/modules/content/']) ? 'bg-emerald-600 text-white' : 'text-emerald-100 hover:bg-emerald-900 hover:text-white' ?>">
-                    <i data-lucide="megaphone" class="h-4 w-4 <?= navActive(['/modules/content/']) ? 'text-white' : 'text-emerald-400' ?>"></i><span class="sidebar-label">Frontend Content</span>
+                <a href="<?= $base ?>/modules/content/index.php" class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold <?= navActive(['/modules/content/index.php']) ? 'bg-emerald-600 text-white' : 'text-emerald-100 hover:bg-emerald-900 hover:text-white' ?>">
+                    <i data-lucide="megaphone" class="h-4 w-4 <?= navActive(['/modules/content/index.php']) ? 'text-white' : 'text-emerald-400' ?>"></i><span class="sidebar-label">Frontend Content</span>
+                </a>
+                <a href="<?= $base ?>/modules/content/blocks.php" class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold <?= navActive(['/modules/content/blocks.php']) ? 'bg-emerald-600 text-white' : 'text-emerald-100 hover:bg-emerald-900 hover:text-white' ?>">
+                    <i data-lucide="layout-grid" class="h-4 w-4 <?= navActive(['/modules/content/blocks.php']) ? 'text-white' : 'text-emerald-400' ?>"></i><span class="sidebar-label">Content Blocks</span>
                 </a>
             </div>
         </div>

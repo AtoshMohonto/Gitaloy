@@ -83,6 +83,14 @@ village → upazila → district → division chain.
 - Key/value site settings live in the `settings` table (`skey`/`svalue`), read/written via
   `getSettings()` and `saveSetting()` in `includes/helpers.php`. Consumed by Site Settings,
   Frontend Content, the login page, and the dashboard announcement banner.
+- Repeatable landing-page content (stats/counters, program/cause cards, gallery photos, update
+  posts, testimonials) lives in the `content_blocks` table (`section`, `title`, `subtitle`, `body`,
+  `icon`, `image`, `stat_value`, `link_url`, `sort_order`, `is_active`), managed via
+  `getContentBlocks()`/`createContentBlock()`/`updateContentBlock()`/`deleteContentBlock()`/
+  `toggleContentBlock()`/`moveContentBlock()` in `includes/helpers.php` and the admin UI at
+  `modules/content/blocks.php` (`?section=stat|program|gallery|update|testimonial`). This is the
+  extension point for adding new landing-page items without a schema change — reuse the `section`
+  column rather than adding new tables when a future item is "one more of the same shape."
 - `index.php` is a public landing page (the main page of the app) showing the program's
   features and the six role descriptions, with Sign in / Create account options. Logged-in
   visitors see a "Go to dashboard" button instead. The hero title/subtitle, hero picture

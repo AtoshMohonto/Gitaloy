@@ -18,10 +18,11 @@ fees, syllabus, tasks, progress, and materials distribution.
 - **Distribution** — zone-wise plans for books, notebooks, pens, bags; per-student records
 - **Reports** — printable attendance sheets, report cards, fee receipts, distribution reports
 - **Student portal** — students log in with their student ID to see their own progress
-- **Landing page** — a public home page at `index.php` showing the program's features and roles, with sign-in / account options and an admin-controlled hero, picture, and notice board
+- **Landing page** — a public, charity-style home page at `index.php`: hero, stats/counters, about, weekly programs, programs/causes, system features, gallery, latest updates, roles, testimonials, support/donate, contact & socials — all admin-controlled and only rendered when they have content
 - **My Account** — any user can update their profile and change their password
 - **Site Settings** — admin-configurable app name, tagline, and contact details
-- **Frontend content** — admin controls the landing page (hero text, picture, notice) plus the login screen text and dashboard announcements
+- **Frontend content** — admin controls every section of the landing page (hero, about, notice, weekly programs, support/donate, contact & social links) plus the login screen text and dashboard announcements
+- **Content Blocks** — a generic repeatable-item manager (`modules/content/blocks.php`) for stats, program/cause cards, gallery photos, update posts, and testimonials. Admin can add, edit, reorder, hide, or delete any number of items per section without touching code.
 - **Modern UI** — Tailwind CSS + Lucide icons with an emerald theme (matching the `sms-dashboard` style)
 
 ## Requirements
@@ -88,6 +89,6 @@ Gitaloy/
     ├── reports/                   # printable documents
     ├── users/                     # account management
     ├── settings/                  # site settings (admin)
-    ├── content/                   # frontend content (admin)
+    ├── content/                   # frontend content (admin) + content blocks manager (blocks.php)
     └── account/                   # my account (profile + password)
 ```
