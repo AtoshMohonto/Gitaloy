@@ -303,6 +303,95 @@ CREATE TABLE IF NOT EXISTS settings (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------------
+-- Step-by-Step Learning ("lc_" = learning center): a concept-first, 5-level
+-- progression per chapter (Concept Explorer -> Practice Player -> Skill
+-- Builder -> Logic Master -> Exam Challenger), matching the Step-By-Step-
+-- Learning-Center project's framework. Reuses the existing classes/subjects
+-- tables as its taxonomy instead of a separate one. Prefixed lc_ so this
+-- feature stays cleanly separable from the attendance/fee/village schema.
+-- ------------------------------------------------------------------
+ALTER TABLE students ADD COLUMN xp_total INT NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS lc_chapters (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  class_id INT DEFAULT NULL,
+  subject_id INT DEFAULT NULL,
+  title VARCHAR(200) NOT NULL,
+  concept_card_body TEXT DEFAULT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_lc_chapters_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL,
+  CONSTRAINT fk_lc_chapters_subject FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL,
+  CONSTRAINT fk_lc_chapters_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS lc_levels (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  chapter_id INT NOT NULL,
+  level_no TINYINT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  description VARCHAR(255) DEFAULT NULL,
+  UNIQUE KEY uq_lc_level (chapter_id, level_no),
+  CONSTRAINT fk_lc_levels_chapter FOREIGN KEY (chapter_id) REFERENCES lc_chapters(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS lc_questions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  level_id INT NOT NULL,
+  question_text TEXT NOT NULL,
+  option_a VARCHAR(255) NOT NULL,
+  option_b VARCHAR(255) NOT NULL,
+  option_c VARCHAR(255) NOT NULL,
+  option_d VARCHAR(255) NOT NULL,
+  correct_option ENUM('a','b','c','d') NOT NULL,
+  created_by INT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_lc_questions_level FOREIGN KEY (level_id) REFERENCES lc_levels(id) ON DELETE CASCADE,
+  CONSTRAINT fk_lc_questions_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS lc_student_progress (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  student_id INT NOT NULL,
+  level_id INT NOT NULL,
+  status ENUM('locked','unlocked','completed') NOT NULL DEFAULT 'locked',
+  score INT NOT NULL DEFAULT 0,
+  attempts INT NOT NULL DEFAULT 0,
+  completed_at DATETIME DEFAULT NULL,
+  UNIQUE KEY uq_lc_progress (student_id, level_id),
+  CONSTRAINT fk_lc_progress_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+  CONSTRAINT fk_lc_progress_level FOREIGN KEY (level_id) REFERENCES lc_levels(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS lc_badges (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(50) NOT NULL UNIQUE,
+  name VARCHAR(100) NOT NULL,
+  description VARCHAR(255) DEFAULT NULL,
+  icon VARCHAR(50) DEFAULT NULL,
+  criteria_type ENUM('concepts_mastered','chapters_finished','total_attempts') NOT NULL,
+  criteria_value INT NOT NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS lc_student_badges (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  student_id INT NOT NULL,
+  badge_id INT NOT NULL,
+  earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_lc_student_badge (student_id, badge_id),
+  CONSTRAINT fk_lc_sbadges_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+  CONSTRAINT fk_lc_sbadges_badge FOREIGN KEY (badge_id) REFERENCES lc_badges(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+INSERT INTO lc_badges (code, name, description, icon, criteria_type, criteria_value) VALUES
+  ('concept_clear', 'Concept Clear', '5 concepts mastered', 'brain', 'concepts_mastered', 5),
+  ('level_finisher', 'Level Finisher', 'Completed all 5 levels of a chapter', 'trophy', 'chapters_finished', 1),
+  ('never_give_up', 'Never Give Up', '10 attempts across any levels — persistence pays off', 'repeat', 'total_attempts', 10)
+ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description);
+
+-- ------------------------------------------------------------------
 -- Content blocks: generic repeatable items for the landing page
 -- (stats/counters, programs/causes, gallery photos, updates, testimonials).
 -- Lets the admin add as many items per section as needed without a code change.
@@ -400,19 +489,22 @@ INSERT INTO permissions (id, pkey, label, pgroup, sort) VALUES
   (23, 'admin.classes', 'Classes, subjects & years', 'Admin Setup', 30),
   (24, 'admin.fees', 'Fee heads & items', 'Admin Setup', 40),
   (25, 'updates.view', 'View class updates', 'Class Updates', 10),
-  (26, 'updates.manage', 'Post class updates', 'Class Updates', 20)
+  (26, 'updates.manage', 'Post class updates', 'Class Updates', 20),
+  (27, 'learning.view', 'Browse step-by-step learning', 'Step-by-Step Learning', 10),
+  (28, 'learning.manage', 'Author chapters & questions', 'Step-by-Step Learning', 20),
+  (29, 'learning.play', 'Play levels & earn XP', 'Step-by-Step Learning', 30)
 ON DUPLICATE KEY UPDATE label = VALUES(label), pgroup = VALUES(pgroup), sort = VALUES(sort);
 
 INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES
   (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
   (1, 11), (1, 12), (1, 13), (1, 14), (1, 15), (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
-  (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26),
+  (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26), (1, 27), (1, 28), (1, 29),
   (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9), (2, 10),
-  (2, 11), (2, 12), (2, 13), (2, 14), (2, 15), (2, 16), (2, 17), (2, 25), (2, 26),
+  (2, 11), (2, 12), (2, 13), (2, 14), (2, 15), (2, 16), (2, 17), (2, 25), (2, 26), (2, 27), (2, 28),
   (3, 1), (3, 2), (3, 3), (3, 4), (3, 5), (3, 6), (3, 7), (3, 8), (3, 9), (3, 10),
-  (3, 11), (3, 12), (3, 13), (3, 14), (3, 15), (3, 16), (3, 17), (3, 25), (3, 26),
+  (3, 11), (3, 12), (3, 13), (3, 14), (3, 15), (3, 16), (3, 17), (3, 25), (3, 26), (3, 27), (3, 28),
   (4, 1), (4, 2), (4, 3), (4, 4), (4, 5), (4, 6), (4, 7), (4, 8), (4, 9), (4, 10),
-  (4, 11), (4, 12), (4, 13), (4, 16), (4, 17), (4, 25),
+  (4, 11), (4, 12), (4, 13), (4, 16), (4, 17), (4, 25), (4, 27),
   (5, 1), (5, 2), (5, 3), (5, 4), (5, 5), (5, 6), (5, 7), (5, 8), (5, 9), (5, 10),
-  (5, 11), (5, 12), (5, 13), (5, 16), (5, 25), (5, 26),
-  (6, 1), (6, 25);
+  (5, 11), (5, 12), (5, 13), (5, 16), (5, 25), (5, 26), (5, 27), (5, 28),
+  (6, 1), (6, 25), (6, 27), (6, 29);

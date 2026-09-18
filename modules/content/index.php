@@ -23,6 +23,7 @@ $defaults = [
     'about_body' => "Gitaloy is a village-based free education program in Bangladesh. Every Friday, children from the village and surrounding areas gather at a local study center — a mosque, madrasa, school hall, or community room — for lessons taught by volunteers.\n\nBeyond teaching, the program tracks attendance, collects small per-head fees, follows each student's progress, and distributes books, notebooks, pens, and bags to those who need them.",
     'about_image' => '',
     'about_active' => '1',
+    'learning_intro_active' => '1',
     'stats_active' => '1',
     'programs_title' => 'Our Programs',
     'programs_subtitle' => 'What the program does for village children, week after week.',
@@ -48,7 +49,7 @@ $defaults = [
     'social_instagram' => '',
 ];
 
-$toggleKeys = ['notice_active', 'weekly_program_active', 'about_active', 'stats_active', 'programs_active', 'gallery_active', 'updates_active', 'testimonials_active', 'support_active'];
+$toggleKeys = ['notice_active', 'weekly_program_active', 'about_active', 'learning_intro_active', 'stats_active', 'programs_active', 'gallery_active', 'updates_active', 'testimonials_active', 'support_active'];
 
 $success = null;
 $error = null;
@@ -235,6 +236,20 @@ require_once __DIR__ . '/../../includes/header.php';
                             <?php endif; ?>
                             <input id="about_image" name="about_image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="mt-1 block w-full max-w-sm text-sm text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-900 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:file:bg-emerald-700">
                         </div>
+                    </div>
+                </section>
+
+                <section class="rounded-2xl border border-emerald-100 bg-white shadow-sm">
+                    <header class="flex flex-wrap items-center gap-2 border-b border-emerald-100 px-5 py-4">
+                        <h2 class="text-base font-bold text-slate-800">Step-by-Step Learning intro</h2>
+                        <a href="<?= appBaseUrl() ?>/modules/content/blocks.php?section=level" class="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50"><i data-lucide="footprints" class="h-3.5 w-3.5"></i>Manage the 5 levels</a>
+                    </header>
+                    <div class="p-5">
+                        <label class="inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
+                            <input type="checkbox" name="learning_intro_active" value="1" <?= (($settings['learning_intro_active'] ?? $defaults['learning_intro_active']) === '1') ? 'checked' : '' ?> class="rounded border-emerald-300 text-emerald-700 focus:ring-emerald-200">
+                            Show the "step-by-step learning" explainer on the landing page
+                        </label>
+                        <p class="mt-2 text-xs text-slate-400">Add the 5 level cards (Concept Explorer &rarr; Exam Challenger) from the Content Blocks manager.</p>
                     </div>
                 </section>
 

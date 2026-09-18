@@ -16,6 +16,9 @@ $aboutBody = $settings['about_body'] ?? '';
 $aboutImage = $settings['about_image'] ?? '';
 $aboutActive = ($settings['about_active'] ?? '1') === '1';
 
+$learningLevels = getContentBlocks('level', true);
+$learningIntroActive = ($settings['learning_intro_active'] ?? '1') === '1';
+
 $stats = ($settings['stats_active'] ?? '1') === '1' ? getContentBlocks('stat', true) : [];
 
 $programs = getContentBlocks('program', true);
@@ -179,6 +182,40 @@ require_once __DIR__ . '/includes/header.php';
                     <?php else: ?>
                         <div class="grid h-64 place-items-center rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/60 text-emerald-300 sm:h-80">
                             <i data-lucide="image" class="h-10 w-10"></i>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </section>
+        <?php endif; ?>
+
+        <?php if ($learningIntroActive && !empty($learningLevels)): ?>
+            <section class="bg-white">
+                <div class="mx-auto max-w-7xl px-6 py-16 sm:px-8">
+                    <div class="mx-auto max-w-2xl text-center">
+                        <p class="text-xs font-bold uppercase tracking-widest text-emerald-600">Learn Smart. Grow Steady. Succeed Surely.</p>
+                        <h2 class="mt-2 text-2xl font-extrabold text-slate-900 sm:text-3xl">A step-by-step learning center</h2>
+                        <p class="mt-3 text-sm leading-relaxed text-slate-500">Every chapter unlocks five levels in order — concept first, never rote memorization. No zero player, retries are always allowed, and progress matters more than rank.</p>
+                    </div>
+                    <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                        <?php foreach ($learningLevels as $i => $lvl): ?>
+                            <div class="relative rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
+                                <span class="grid h-10 w-10 place-items-center rounded-xl bg-emerald-900 text-sm font-extrabold text-white">L<?= $i + 1 ?></span>
+                                <?php if (!empty($lvl['icon'])): ?>
+                                    <i data-lucide="<?= htmlspecialchars($lvl['icon']) ?>" class="mt-3 h-5 w-5 text-emerald-600"></i>
+                                <?php endif; ?>
+                                <h3 class="mt-2 text-sm font-bold text-slate-900"><?= htmlspecialchars($lvl['title'] ?? '') ?></h3>
+                                <?php if (!empty($lvl['body'])): ?>
+                                    <p class="mt-1.5 text-xs leading-relaxed text-slate-500"><?= htmlspecialchars($lvl['body']) ?></p>
+                                <?php endif; ?>
+                                <?php if ($i < count($learningLevels) - 1): ?>
+                                    <span class="absolute -right-3 top-1/2 hidden -translate-y-1/2 text-emerald-300 lg:block">&rarr;</span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php if (!empty($_SESSION['user_id'])): ?>
+                        <div class="mt-10 text-center">
+                            <a href="<?= $base ?>/modules/learning/index.php" class="inline-flex items-center gap-2 rounded-xl bg-emerald-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"><i data-lucide="footprints" class="h-5 w-5"></i>Start learning</a>
                         </div>
                     <?php endif; ?>
                 </div>

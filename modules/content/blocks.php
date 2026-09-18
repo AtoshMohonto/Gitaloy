@@ -5,6 +5,12 @@ require_once __DIR__ . '/../../includes/helpers.php';
 requirePermission('content.manage');
 
 $sectionsConfig = [
+    'level' => [
+        'label' => 'Step-by-Step Levels',
+        'icon' => 'footprints',
+        'fields' => ['icon', 'title', 'body'],
+        'hint' => 'The 5-level flow shown on the landing page, e.g. "Concept Explorer — Basic understanding". Add in order (L1 first).',
+    ],
     'stat' => [
         'label' => 'Stats & Counters',
         'icon' => 'bar-chart-3',
